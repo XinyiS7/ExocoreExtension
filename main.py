@@ -1,177 +1,81 @@
-"""
-ExoCore Extension — Polished Version.
-"""
-import threading
-import keyboard
 import pystray
-import sys
 from PIL import Image, ImageDraw
+import sys
+import os
+import importlib
+import pkgutil
 
-try:
-    import win32gui
-except ImportError:
-    win32gui = None
+from core.base_extension import BaseExtension
+from config import COLORS, EXOCORE_AGENT_NAME
 
-from capture.clipboard import capture_selected_text
-from capture.uiautomation_capture import capture_active_window_text
-from ui.overlay import ask_prompt
-from ui.response_popup import show_response
-from ui.settings import show_settings
-from vault.obsidian_writer import save_note, append_reply
-from sender.exocore_client import ExocoreClient
-from config import (
-    HOTKEY_CLIPBOARD_CAPTURE,
-    HOTKEY_UI_CAPTURE,
-    CLIPBOARD_FALLBACK,
-)
+def _get_extensions() -> list[BaseExtension]:
+    extensions = []
+    ext_path = os.path.join(os.path.dirname(__file__), "extensions")
+    print(f"[ExoCore] Searching for extensions in: {ext_path}")
+    
+    if not os.path.exists(ext_path):
+        print(f"[ExoCore] ERROR: Extensions path does not exist!")
+        return []
 
-
-def _get_source_app() -> str:
-    if not win32gui:
-        return "Windows (No win32gui)"
-    try:
-        hwnd = win32gui.GetForegroundWindow()
-        return win32gui.GetWindowText(hwnd) or "Unknown Window"
-    except Exception:
-        return "Unknown Window"
-
-
-def handle_capture(text: str | None) -> None:
-    if not text:
-        print("[ExoCore] Capture failed or empty.")
-        return
-
-    source_app = _get_source_app()
-    # Ensure UI runs in its own thread safely
-    result = ask_prompt(text, source_app)
-    if not result:
-        return  # User cancelled
-
-    custom_title = result.get("custom_title") or source_app
-    agent_name = result.get("agent_name", "Alessandro")
-
-    # Update AVAILABLE_AGENTS if this is a new name
-    from config import AVAILABLE_AGENTS
-    if agent_name and agent_name not in AVAILABLE_AGENTS:
-        try:
-            import os, re
-            config_path = os.path.join(os.path.dirname(__file__), "config.py")
-            with open(config_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            AVAILABLE_AGENTS.append(agent_name)
-            new_list_str = str(AVAILABLE_AGENTS)
-            content = re.sub(r'AVAILABLE_AGENTS\s*=\s*\[.*?\]', f'AVAILABLE_AGENTS = {new_list_str}', content)
-            with open(config_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"[ExoCore] New agent '{agent_name}' added to persistent config.")
-        except Exception as e:
-            print(f"[ExoCore] Failed to persist new agent: {e}")
-
-    client = ExocoreClient(agent_name=agent_name)
-
-    # 1. Offline Save (Always)
-    note_path = None
-    try:
-        note_path = save_note(
-            content=text,
-            user_prompt=result["prompt"],
-            source_app=source_app,
-            note_type=result["note_type"],
-            custom_title=custom_title,
-            target_path=result.get("vault_path")
-        )
-        print(f"[ExoCore] Local copy: {note_path}")
-    except Exception as e:
-        print(f"[ExoCore] CRITICAL: File save failed: {e}", file=sys.stderr)
-
-    # 2. Online Injection
-    if result["send_to_exocore"]:
-        print(f"[ExoCore] Injecting context for {agent_name}...")
-        try:
-            capture_method = "uiautomation" if "uia" in source_app.lower() else "clipboard"
-            target = "obsidian" if result["note_type"] == "reading_note" else "session_memory"
-            
-            resp = client.inject_context(
-                captured_text=text,
-                user_prompt=result["prompt"],
-                capture_method=capture_method,
-                target_storage=target,
-                custom_title=custom_title,
-            )
-            
-            g045_reply = resp.get("reply", "(no reply returned)")
-            
-            # Auto-append the reply to the note immediately
+    for loader, module_name, is_pkg in pkgutil.iter_modules([ext_path]):
+        print(f"[ExoCore] Found module candidate: {module_name} (is_pkg: {is_pkg})")
+        if is_pkg:
+            full_module_name = f"extensions.{module_name}.extension"
             try:
-                from config import VAULT_PATH
-                base_path = result.get("vault_path") or VAULT_PATH
-                append_reply(note_path, base_path, custom_title, agent_name, g045_reply)
-                print(f"[ExoCore] Reply automatically appended via title '{custom_title}'")
+                module = importlib.import_module(full_module_name)
+                # Look for classes that inherit from BaseExtension
+                found_in_module = False
+                for attr_name in dir(module):
+                    attr = getattr(module, attr_name)
+                    if isinstance(attr, type) and issubclass(attr, BaseExtension) and attr is not BaseExtension:
+                        extensions.append(attr())
+                        found_in_module = True
+                        print(f"[ExoCore] Successfully loaded extension class: {attr_name} from {module_name}")
+                if not found_in_module:
+                    print(f"[ExoCore] Warning: No BaseExtension subclass found in {full_module_name}")
             except Exception as e:
-                print(f"[ExoCore] CRITICAL: Failed to append reply: {e}", file=sys.stderr)
-
-            show_response(
-                captured_text=text,
-                user_prompt=result["prompt"],
-                agent_name=agent_name,
-                agent_reply=g045_reply,
-                custom_title=custom_title,
-                on_save_callback=None, # Already saved automatically
-            )
-        except Exception as e:
-            print(f"[ExoCore] API Error: {e}", file=sys.stderr)
-            # Optional: show an error popup here if the UI is preferred over console
-
-
-
-def on_clipboard_hotkey():
-    threading.Thread(target=lambda: handle_capture(capture_selected_text()), daemon=True).start()
-
-
-def on_uia_hotkey():
-    def _run():
-        text = capture_active_window_text()
-        if not text and CLIPBOARD_FALLBACK:
-            text = capture_selected_text()
-        handle_capture(text)
-    threading.Thread(target=_run, daemon=True).start()
-
-
-def open_settings_ui():
-    threading.Thread(target=show_settings, daemon=True).start()
-
+                import traceback
+                print(f"[ExoCore] Failed to load extension {module_name}: {e}")
+                traceback.print_exc()
+    return extensions
 
 def _make_tray_icon() -> Image.Image:
     # A more "ExoCore" looking icon: Gold circle on dark gray
     img = Image.new("RGBA", (64, 64), color=(0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    d.ellipse([8, 8, 56, 56], fill=(26, 30, 41)) # exo-panel
-    d.ellipse([16, 16, 48, 48], outline=(237, 213, 84), width=3) # exo-accent
+    d.ellipse([8, 8, 56, 56], fill=COLORS["panel"])
+    d.ellipse([16, 16, 48, 48], outline=COLORS["accent"], width=3)
     return img
 
-
 def main():
-    keyboard.add_hotkey(HOTKEY_CLIPBOARD_CAPTURE, on_clipboard_hotkey)
-    keyboard.add_hotkey(HOTKEY_UI_CAPTURE, on_uia_hotkey)
+    extensions = _get_extensions()
+    
+    for ext in extensions:
+        print(f"[ExoCore] Starting extension: {ext.name}")
+        ext.start()
+
+    def on_quit(icon):
+        for ext in extensions:
+            ext.stop()
+        icon.stop()
+
+    # Build menu
+    menu_items = []
+    for ext in extensions:
+        menu_items.extend(ext.get_menu_items())
+        menu_items.append(pystray.Menu.SEPARATOR)
+    
+    menu_items.append(pystray.MenuItem("Quit", on_quit))
 
     icon = pystray.Icon(
         "ExoCoreExtension",
         _make_tray_icon(),
-        "ExoCore Extension",
-        menu=pystray.Menu(
-            pystray.MenuItem("Capture selected (Ctrl+Alt+A)", lambda: on_clipboard_hotkey()),
-            pystray.MenuItem("Capture window   (Ctrl+Alt+S)", lambda: on_uia_hotkey()),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Settings...", lambda: open_settings_ui()),
-            pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit", lambda: icon.stop()),
-        ),
+        f"ExoCore Extension ({len(extensions)} loaded)",
+        menu=pystray.Menu(*menu_items),
     )
 
-    from config import EXOCORE_AGENT_NAME
-    print(f"[ExoCore Extension] Active. Mode: {EXOCORE_AGENT_NAME}")
+    print(f"[ExoCore Extension Hub] Active. Primary Agent: {EXOCORE_AGENT_NAME}")
     icon.run()
-
 
 if __name__ == "__main__":
     main()

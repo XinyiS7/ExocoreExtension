@@ -1,0 +1,1 @@
+# Clipboard Capture Extension Package

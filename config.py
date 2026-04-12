@@ -5,6 +5,8 @@ ExocoreExtension configuration.
 # ExoCore backend
 EXOCORE_BASE_URL = "http://127.0.0.1:8000"
 EXOCORE_API_KEY = ""
+EXOCORE_ADMIN_KEY = "alessandro_root_045"        # Matches settings.ADMIN_TRIGGER_KEY  (admin override)
+EXOCORE_EXTENSION_KEY = "exocore_pollox"    # Matches EXTENSION_SECRET in ExoCore .env (per-extension token)
 EXOCORE_PRESET_ID = 1
 EXOCORE_AGENT_NAME = "Alessandro"  # Default agent
 AVAILABLE_AGENTS = ['Alessandro']

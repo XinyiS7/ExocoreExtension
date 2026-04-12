@@ -4,16 +4,46 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="" />
+    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/capture/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/capture/clipboard.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/capture/uiautomation_capture.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/sender/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/sender/exocore_client.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/overlay.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/response_popup.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/ui/settings.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/vault/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/vault/obsidian_writer.py" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 5,
-  "fromUser": false
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "XinyiS7"
+  }
 }]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "git@github.com:XinyiS7/ExocoreExtension.git",
+    "accountId": "d41409ed-a97d-4f80-bd40-fac2ed4b8b38"
+  }
+}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 5,
+  &quot;fromUser&quot;: false
+}</component>
   <component name="ProjectId" id="3CEBzaDMTkcyTJbn5SzQhEA0nu1" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -26,6 +56,8 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true",
     "last_opened_file_path": "D:/Alicia/ExocoreExtension",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
@@ -51,6 +83,7 @@
       <option name="presentableId" value="Default" />
       <updated>1775941112189</updated>
       <workItem from="1775941113226" duration="2540000" />
+      <workItem from="1775997008090" duration="3951000" />
     </task>
     <servers />
   </component>
