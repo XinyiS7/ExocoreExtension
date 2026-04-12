@@ -1,4 +1,3 @@
-import glob
 import json
 import os
 import re
@@ -7,7 +6,7 @@ import time
 
 from pystray import MenuItem
 from core.base_extension import BaseExtension
-from config import DST_CMD_QUEUE_FILENAME
+from config import DST_CLUSTER_PATH, DST_CMD_QUEUE_FILENAME
 from .context_manager import DSTContextManager
 from .watcher import DSTWatcher
 from .executor import DSTExecutor
@@ -16,52 +15,24 @@ from .exocore_lite_client import ExocoreLiteClient
 
 class DSTBridgeExtension(BaseExtension):
     # ------------------------------------------------------------------
-    # Path resolution — dynamic, called at runtime via lambda
+    # Path resolution — rooted at DST_CLUSTER_PATH (e.g. .../Cluster_4)
+    # Master and Caves are direct subdirectories of that cluster folder.
     # ------------------------------------------------------------------
 
-    _KLEI_BASE = r"D:\Documents\Klei\DoNotStarveTogether"
+    def _shard_dir(self, shard: str) -> str:
+        """Absolute path to a shard folder, e.g. .../Cluster_4/Master"""
+        return os.path.join(DST_CLUSTER_PATH, shard)
 
-    def _resolve_log_dir(self) -> str:
-        """
-        Find the Master directory of the most recently active cluster.
-        Returns the full path to the Master folder, or an empty string if not found.
-        """
-        pattern = os.path.join(self._KLEI_BASE, "**", "Master", "server_log.txt")
-        logs = glob.glob(pattern, recursive=True)
-        logs = [l for l in logs if "Cluster" in l]
-
-        if not logs:
-            # Fallback: search without requiring Master sub-folder
-            pattern_flat = os.path.join(self._KLEI_BASE, "**", "server_log.txt")
-            logs = [l for l in glob.glob(pattern_flat, recursive=True) if "Cluster" in l]
-
-        if not logs:
-            print("[DST Bridge] Warning: No server_log.txt found under Klei base.")
-            return ""
-
-        # Master always preferred over Caves; break ties by most-recently modified
-        logs.sort(key=lambda x: ("Caves" in x, -os.path.getmtime(x)))
-        log_dir = os.path.dirname(logs[0])
-        print(f"[DST Bridge] Active log dir: {log_dir}")
-        return log_dir
-
-    def _resolve_state_file(self) -> str:
-        log_dir = self._resolve_log_dir()
-        if not log_dir:
-            return os.path.join(self._KLEI_BASE, "client_save", "log.txt")
-        return os.path.join(log_dir, "server_log.txt")
+    def _resolve_state_file(self, shard: str = "Master") -> str:
+        return os.path.join(self._shard_dir(shard), "server_log.txt")
 
     def _resolve_chat_file(self) -> str:
-        log_dir = self._resolve_log_dir()
-        if not log_dir:
-            return os.path.join(self._KLEI_BASE, "client_save", "server_chat_log.txt")
-        return os.path.join(log_dir, "server_chat_log.txt")
+        # DST writes player chat + system announcements to Master/server_chat_log.txt
+        return os.path.join(self._shard_dir("Master"), "server_chat_log.txt")
 
     def _resolve_cmd_queue_file(self) -> str:
-        log_dir = self._resolve_log_dir()
-        if not log_dir:
-            return os.path.join(self._KLEI_BASE, DST_CMD_QUEUE_FILENAME)
-        return os.path.join(log_dir, DST_CMD_QUEUE_FILENAME)
+        # Command queue goes to Master; the mod polls it from the Master shard process
+        return os.path.join(self._shard_dir("Master"), DST_CMD_QUEUE_FILENAME)
 
     # ------------------------------------------------------------------
     # Init
@@ -75,15 +46,24 @@ class DSTBridgeExtension(BaseExtension):
         self.executor = DSTExecutor(method="file", queue_file_resolver=self._resolve_cmd_queue_file)
         self.client = ExocoreLiteClient()
 
-        # State log watcher: forwards [EXO_STATE] JSON lines
+        # Master shard state watcher: [EXO_STATE] JSON lines from server_log.txt
         self.state_watcher = DSTWatcher(
-            file_path=self._resolve_state_file,
+            file_path=lambda: self._resolve_state_file("Master"),
             line_callback=self._on_state_line,
             line_filter=lambda line: "[EXO_STATE]" in line,
-            name="DST-StateWatcher",
+            name="DST-MasterStateWatcher",
         )
 
-        # Chat log watcher: forwards all non-empty lines as chat events
+        # Caves shard state watcher: same filter, optional — waits silently if Caves
+        # server is not running (DSTWatcher already handles missing files).
+        self.caves_watcher = DSTWatcher(
+            file_path=lambda: self._resolve_state_file("Caves"),
+            line_callback=self._on_state_line,
+            line_filter=lambda line: "[EXO_STATE]" in line,
+            name="DST-CavesStateWatcher",
+        )
+
+        # Chat log watcher: Master/server_chat_log.txt (player chat + announcements)
         self.chat_watcher = DSTWatcher(
             file_path=self._resolve_chat_file,
             line_callback=self._on_chat_line,
@@ -128,15 +108,16 @@ Guidelines:
     # ------------------------------------------------------------------
 
     def start(self):
-        state_path = self._resolve_state_file()
-        chat_path = self._resolve_chat_file()
-        print(f"[{self._name}] Starting — state: {state_path}")
-        print(f"[{self._name}] Starting — chat:  {chat_path}")
+        print(f"[{self._name}] Starting — Master state: {self._resolve_state_file('Master')}")
+        print(f"[{self._name}] Starting — Caves  state: {self._resolve_state_file('Caves')}")
+        print(f"[{self._name}] Starting — chat:         {self._resolve_chat_file()}")
         self.state_watcher.start()
+        self.caves_watcher.start()
         self.chat_watcher.start()
 
     def stop(self):
         self.state_watcher.stop()
+        self.caves_watcher.stop()
         self.chat_watcher.stop()
 
     def get_menu_items(self) -> list[MenuItem]:
