@@ -4,13 +4,9 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="watcher层级改动到存档级，同时监控地表和洞穴">
+    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="通讯链路重新接通">
       <change beforePath="$PROJECT_DIR$/.idea/ExocoreExtension.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/ExocoreExtension.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dst_mod_source/modmain.lua" beforeDir="false" afterPath="$PROJECT_DIR$/dst_mod_source/modmain.lua" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/sender/exocore_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/sender/exocore_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/dst_bridge/exocore_lite_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/dst_bridge/exocore_lite_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/dst_bridge/extension.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/dst_bridge/extension.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -51,12 +47,13 @@
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "D:/Alicia/ExocoreExtension/Plan",
+    "last_opened_file_path": "D:/Alicia/ExoCore_Project/ExocoreExtension",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -82,7 +79,8 @@
       <updated>1775941112189</updated>
       <workItem from="1775941113226" duration="2540000" />
       <workItem from="1775997008090" duration="11265000" />
-      <workItem from="1776076828967" duration="1011000" />
+      <workItem from="1776076828967" duration="1313000" />
+      <workItem from="1776078357743" duration="2038000" />
     </task>
     <task id="LOCAL-00001" summary="怎么欠了这么多东西">
       <option name="closed" value="true" />
@@ -108,7 +106,15 @@
       <option name="project" value="LOCAL" />
       <updated>1776030198766</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="通讯链路重新接通">
+      <option name="closed" value="true" />
+      <created>1776078133010</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1776078133010</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -118,6 +124,7 @@
     <MESSAGE value="怎么欠了这么多东西" />
     <MESSAGE value="心力交瘁地找bug" />
     <MESSAGE value="watcher层级改动到存档级，同时监控地表和洞穴" />
-    <option name="LAST_COMMIT_MESSAGE" value="watcher层级改动到存档级，同时监控地表和洞穴" />
+    <MESSAGE value="通讯链路重新接通" />
+    <option name="LAST_COMMIT_MESSAGE" value="通讯链路重新接通" />
   </component>
 </project>
