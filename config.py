@@ -16,12 +16,19 @@ EXOCORE_API_KEY = ""
 EXOCORE_ADMIN_KEY = "alessandro_root_045"        # Matches settings.ADMIN_TRIGGER_KEY  (admin override)
 EXOCORE_EXTENSION_KEY = "exocore_pollux"    # Matches EXTENSION_SECRET in
 # ExoCore .env (per-extension token)
-EXOCORE_PRESET_ID = 1
 EXOCORE_AGENT_NAME = "Alessandro"  # Default agent
-AVAILABLE_AGENTS = ['Alessandro']
+AGENT_CONFIGS = [{'name': 'Alessandro', 'mode': 'lite_private'}]
+
+
+def get_agent_mode(name: str) -> str:
+    """Return the mode configured for the given agent name, defaulting to 'zero_tool'."""
+    for cfg in AGENT_CONFIGS:
+        if cfg["name"] == name:
+            return cfg["mode"]
+    return "zero_tool"
 
 # Obsidian vault
-VAULT_PATH = r"D:\Alicia\Tales-on-leaves\壁炉书房"
+VAULT_PATH = r"D:/Alicia/Tales-on-leaves/壁炉书房/读书笔记"
 
 # Hotkeys
 HOTKEY_CLIPBOARD_CAPTURE = "ctrl+alt+a"

@@ -4,6 +4,7 @@ import sys
 import os
 import importlib
 import pkgutil
+import threading
 
 from core.base_extension import BaseExtension
 from config import COLORS, EXOCORE_AGENT_NAME
@@ -59,12 +60,17 @@ def main():
             ext.stop()
         icon.stop()
 
+    from extensions.clipboard_capture.ui.settings import show_settings
+
     # Build menu
-    menu_items = []
+    menu_items = [
+        pystray.MenuItem("Settings...", lambda icon, item: threading.Thread(target=show_settings, daemon=True).start()),
+        pystray.Menu.SEPARATOR,
+    ]
     for ext in extensions:
         menu_items.extend(ext.get_menu_items())
         menu_items.append(pystray.Menu.SEPARATOR)
-    
+
     menu_items.append(pystray.MenuItem("Quit", on_quit))
 
     icon = pystray.Icon(

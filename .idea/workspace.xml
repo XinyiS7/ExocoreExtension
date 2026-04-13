@@ -4,7 +4,17 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="准备修正payload 格式" />
+    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="准备修正payload 格式">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/api_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/api_client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/extension.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/extension.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/sender/exocore_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/sender/exocore_client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/ui/overlay.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/ui/overlay.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/ui/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/ui/settings.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/dst_bridge/exocore_lite_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/dst_bridge/exocore_lite_client.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -77,7 +87,7 @@
       <workItem from="1775941113226" duration="2540000" />
       <workItem from="1775997008090" duration="11265000" />
       <workItem from="1776076828967" duration="1313000" />
-      <workItem from="1776078357743" duration="2683000" />
+      <workItem from="1776078357743" duration="8014000" />
     </task>
     <task id="LOCAL-00001" summary="怎么欠了这么多东西">
       <option name="closed" value="true" />
@@ -119,7 +129,15 @@
       <option name="project" value="LOCAL" />
       <updated>1776088898629</updated>
     </task>
-    <option name="localTasksCounter" value="6" />
+    <task id="LOCAL-00006" summary="准备修正payload 格式">
+      <option name="closed" value="true" />
+      <created>1776089964065</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1776089964065</updated>
+    </task>
+    <option name="localTasksCounter" value="7" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

@@ -5,7 +5,7 @@ Fixed visibility issues by avoiding ttk styles in dark mode.
 import os
 import tkinter as tk
 from tkinter import filedialog
-from config import COLORS, FONTS, VAULT_PATH, EXOCORE_AGENT_NAME, AVAILABLE_AGENTS
+from config import COLORS, FONTS, VAULT_PATH, EXOCORE_AGENT_NAME, AGENT_CONFIGS
 
 
 def ask_prompt(preview_text: str, source_app: str) -> dict | None:
@@ -110,36 +110,54 @@ def ask_prompt(preview_text: str, source_app: str) -> dict | None:
     suggestion_list.bind("<Double-Button-1>", on_suggestion_select)
     suggestion_list.bind("<Return>", on_suggestion_select)
 
-    # Row 1: Agent & Note Type
+    # Row 1: Agent & Mode & Note Type
     tk.Label(grid, text="AGENT", anchor="w", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).grid(row=1, column=0, sticky="w", pady=4)
     
     agent_frame = tk.Frame(grid, bg=COLORS["bg"])
     agent_frame.grid(row=1, column=1, sticky="w", pady=4)
 
     agent_var = tk.StringVar(value=EXOCORE_AGENT_NAME)
-    agent_entry = tk.Entry(agent_frame, textvariable=agent_var, bg=COLORS["surface"], fg=COLORS["accent"], font=FONTS["sans"], relief="flat", width=15, insertbackground=COLORS["accent"])
+    agent_entry = tk.Entry(agent_frame, textvariable=agent_var, bg=COLORS["surface"], fg=COLORS["accent"], font=FONTS["sans"], relief="flat", width=12, insertbackground=COLORS["accent"])
     agent_entry.pack(side="left")
 
-    def set_agent(val):
+    mode_var = tk.StringVar(value="zero_tool")
+    
+    def on_agent_selected(val):
         agent_var.set(val)
+        # Update mode if agent is known
+        from config import AGENT_CONFIGS
+        for cfg in AGENT_CONFIGS:
+            if cfg["name"] == val:
+                mode_var.set(cfg.get("mode", "zero_tool"))
+                break
 
-    agent_opt = tk.OptionMenu(agent_frame, agent_var, *AVAILABLE_AGENTS, command=set_agent)
+    _agent_names = [cfg["name"] for cfg in AGENT_CONFIGS]
+    agent_opt = tk.OptionMenu(agent_frame, agent_var, *_agent_names, command=on_agent_selected)
     agent_opt.config(bg=COLORS["panel"], fg=COLORS["text"], font=("Arial", 8), relief="flat", highlightthickness=0, width=1)
     agent_opt["menu"].config(bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["sans"])
     agent_opt.pack(side="left", padx=(2, 0))
 
-    tk.Label(grid, text=" TYPE", anchor="e", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).grid(row=1, column=2, sticky="e", padx=(10, 5))
+    tk.Label(grid, text=" MODE", anchor="w", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).grid(row=1, column=2, sticky="w", padx=(5, 5))
+    
+    MODE_OPTIONS = ["zero_tool", "lite_private", "special_extend", "grounding"]
+    mode_menu = tk.OptionMenu(grid, mode_var, *MODE_OPTIONS)
+    mode_menu.config(bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["sans"], relief="flat", highlightthickness=0, width=10)
+    mode_menu["menu"].config(bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["sans"])
+    mode_menu.grid(row=1, column=3, sticky="w", pady=4)
+
+    # Row 2: Note Type
+    tk.Label(grid, text="TYPE", anchor="w", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).grid(row=2, column=0, sticky="w", pady=4)
     note_type_var = tk.StringVar(value="reading_note")
     type_menu = tk.OptionMenu(grid, note_type_var, "reading_note", "debug_session")
     type_menu.config(bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["sans"], relief="flat", activebackground=COLORS["panel"], activeforeground=COLORS["accent"], highlightthickness=0)
     type_menu["menu"].config(bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["sans"])
-    type_menu.grid(row=1, column=3, sticky="e", pady=4)
+    type_menu.grid(row=2, column=1, sticky="w", pady=4)
 
-    # Row 2: Vault
-    tk.Label(grid, text="VAULT", anchor="w", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).grid(row=2, column=0, sticky="w", pady=4)
+    # Row 3: Vault
+    tk.Label(grid, text="VAULT", anchor="w", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).grid(row=3, column=0, sticky="w", pady=4)
     
     vault_frame = tk.Frame(grid, bg=COLORS["bg"])
-    vault_frame.grid(row=2, column=1, columnspan=3, sticky="ew", pady=4)
+    vault_frame.grid(row=3, column=1, columnspan=3, sticky="ew", pady=4)
     
     vault_var = tk.StringVar(value=VAULT_PATH)
     vault_entry = tk.Entry(vault_frame, textvariable=vault_var, bg=COLORS["surface"], fg=COLORS["muted"], font=FONTS["sans"], state="readonly", relief="flat")
@@ -173,6 +191,7 @@ def ask_prompt(preview_text: str, source_app: str) -> dict | None:
         result["custom_title"] = title_entry.get().strip()
         result["vault_path"] = vault_var.get()
         result["agent_name"] = agent_var.get().strip()
+        result["mode"] = mode_var.get()
         root.destroy()
 
     def on_cancel(event=None):

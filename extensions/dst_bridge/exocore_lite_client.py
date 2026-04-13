@@ -1,5 +1,5 @@
 import requests
-from config import EXOCORE_BASE_URL, EXOCORE_PRESET_ID, EXOCORE_ADMIN_KEY, EXOCORE_EXTENSION_KEY
+from config import EXOCORE_BASE_URL, EXOCORE_AGENT_NAME, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
 
 
 class ExocoreLiteClient:
@@ -22,7 +22,7 @@ class ExocoreLiteClient:
         model: str = "",
         level: str = "",
         temperature: float | None = None,
-        preset_id: int | None = None,
+        agent_name: str = "",
         history: list | None = None,
     ) -> str:
         """
@@ -32,24 +32,25 @@ class ExocoreLiteClient:
             prompt:        Current game state / user message (latest turn).
             system_prompt: Appended (not replacing) to the preset's base system prompt.
             model:         Model override — empty string defers to preset default.
-            level:         Thinking depth: "low" | "medium" | "high" (or numeric string).
+            level:         Thinking depth: "low" | "medium" | "high".
             temperature:   Generation temperature override; None = use ExoCore default.
-            preset_id:     AgentPreset ID; falls back to EXOCORE_PRESET_ID from config.
+            agent_name:    Agent name string; falls back to EXOCORE_AGENT_NAME from config.
             history:       Prior turns as [{"role": "user"|"assistant", "content": "..."}].
                            Current prompt is appended as the final user turn.
         """
-        resolved_preset_id = preset_id or EXOCORE_PRESET_ID
+        resolved_agent = agent_name or EXOCORE_AGENT_NAME
 
         messages = list(history) if history else []
         messages.append({"role": "user", "content": prompt})
 
         payload: dict = {
-            "preset_id":      resolved_preset_id,
+            "client_type":    "dst_bridge",
+            "client_display": "DST Bridge",
+            "agent":          resolved_agent,
             "messages":       messages,
             "source":         "game_state",
             "target_storage": "external_session",
-            "mode":           "lite_tool",
-            "client_type":    "dst_bridge",
+            "mode":           "lite_private",
         }
 
         # Optional overrides — only include when non-empty/non-None
@@ -62,10 +63,10 @@ class ExocoreLiteClient:
         if temperature is not None:
             payload["temperature"] = temperature
 
-        # Prefer per-extension token; fall back to admin key
+        # Auth: body extension_secret preferred; fallback to X-Admin-Key header
         headers = {}
         if EXOCORE_EXTENSION_KEY:
-            headers["X-Extension-Key"] = EXOCORE_EXTENSION_KEY
+            payload["extension_secret"] = EXOCORE_EXTENSION_KEY
         elif EXOCORE_ADMIN_KEY:
             headers["X-Admin-Key"] = EXOCORE_ADMIN_KEY
 
