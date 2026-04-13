@@ -6,6 +6,7 @@ class ExocoreLiteClient:
     """
     Client for ExoCore external_context_inject API.
     Used by DST Bridge to get real-time AI advice during gameplay.
+    Payload format per: ExoCore/Plan/ExocoreExtension_Payload_Spec.md
     """
 
     ENDPOINT = "/api/agents/external_context_inject/"
@@ -19,42 +20,47 @@ class ExocoreLiteClient:
         prompt: str,
         system_prompt: str = "",
         model: str = "",
+        level: str = "",
+        temperature: float | None = None,
         preset_id: int | None = None,
-        agent_name: str | None = None,
         history: list | None = None,
     ) -> str:
         """
-        Send game state + history to ExoCore and return Alessandro's reply.
+        Send game state + conversation history to ExoCore; return Alessandro's reply.
 
         Args:
             prompt:        Current game state / user message (latest turn).
-            system_prompt: DST-specific system prompt to override preset default.
-            model:         Optional model override (empty = use preset default).
-            preset_id:     Preset ID (falls back to EXOCORE_PRESET_ID from config).
-            agent_name:    Unused, kept for signature compatibility.
+            system_prompt: Appended (not replacing) to the preset's base system prompt.
+            model:         Model override — empty string defers to preset default.
+            level:         Thinking depth: "low" | "medium" | "high" (or numeric string).
+            temperature:   Generation temperature override; None = use ExoCore default.
+            preset_id:     AgentPreset ID; falls back to EXOCORE_PRESET_ID from config.
             history:       Prior turns as [{"role": "user"|"assistant", "content": "..."}].
-                           If provided, current prompt is appended as the final user turn.
+                           Current prompt is appended as the final user turn.
         """
         resolved_preset_id = preset_id or EXOCORE_PRESET_ID
 
-        # Build multi-turn messages list
         messages = list(history) if history else []
         messages.append({"role": "user", "content": prompt})
 
-        payload = {
+        payload: dict = {
             "preset_id":      resolved_preset_id,
             "messages":       messages,
             "source":         "game_state",
             "target_storage": "external_session",
-            "mode":           "zero_tool",
+            "mode":           "lite_tool",
             "client_type":    "dst_bridge",
-            "user_prompt":    "",
-            "custom_title":   "",
         }
+
+        # Optional overrides — only include when non-empty/non-None
         if system_prompt:
             payload["system_prompt"] = system_prompt
         if model:
             payload["model"] = model
+        if level:
+            payload["level"] = level
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         # Prefer per-extension token; fall back to admin key
         headers = {}

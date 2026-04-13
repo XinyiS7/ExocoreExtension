@@ -14,7 +14,12 @@ local CMD_QUEUE_FILE = "exo_cmd_queue.txt"
 -- ----------------------------------------------------------
 
 local function ExportState(is_forced)
+    -- ThePlayer is nil on a dedicated server (server-side process has no local player).
+    -- Fall back to the first entry in AllPlayers so dedicated servers work too.
     local player = GLOBAL.ThePlayer
+    if player == nil and GLOBAL.AllPlayers and #GLOBAL.AllPlayers > 0 then
+        player = GLOBAL.AllPlayers[1]
+    end
     if player == nil then return end
 
     local state = {

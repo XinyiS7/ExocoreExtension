@@ -140,8 +140,10 @@ Guidelines:
             return
         self.on_state_changed(data)
 
-    # Keywords that identify DST system events (not player-initiated chat)
+    # Keywords that identify DST system events (not player-initiated chat).
+    # Player chat lines contain "[Say]"; announcement lines contain "Announcement".
     _SYSTEM_CHAT_KEYWORDS = ("Announcement",)
+    _PLAYER_CHAT_KEYWORD = "[Say]"
 
     def _on_chat_line(self, line: str):
         """
@@ -161,11 +163,12 @@ Guidelines:
             return
 
         is_system = any(kw in stripped for kw in self._SYSTEM_CHAT_KEYWORDS)
-        label = "EVENT" if is_system else "CHAT"
+        is_player_chat = self._PLAYER_CHAT_KEYWORD in stripped
+        label = "CHAT" if is_player_chat else ("EVENT" if is_system else "LOG")
         self.context.add_event(f"{label}: {stripped}")
         print(f"[DST ChatWatcher] {stripped}")
 
-        if not is_system:
+        if is_player_chat:
             now = time.time()
             if now - self._last_chat_trigger_time > 5:
                 self._last_chat_trigger_time = now

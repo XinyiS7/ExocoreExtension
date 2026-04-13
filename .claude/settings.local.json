@@ -11,7 +11,9 @@
       "Bash(curl:*)",
       "Bash(tmux-bridge read:*)",
       "Bash(tmux-bridge message:*)",
-      "Bash(tmux-bridge keys:*)"
+      "Bash(tmux-bridge keys:*)",
+      "Bash(grep -r \"D:\\\\\\\\\\\\\\\\Alicia\\\\|/Alicia/\\\\|ExoCore\\\\|exocore-ui\" D:/Alicia/ExocoreExtension --include=\"*.py\" --include=\"*.lua\" --include=\"*.json\" -l)",
+      "Bash(grep:*)"
     ]
   }
 }
