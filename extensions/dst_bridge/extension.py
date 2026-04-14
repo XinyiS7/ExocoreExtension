@@ -6,7 +6,7 @@ import time
 
 from pystray import MenuItem
 from core.base_extension import BaseExtension
-from config import DST_CLUSTER_PATH, DST_CMD_QUEUE_FILENAME
+from config import DST_CLUSTER_PATH, DST_CMD_QUEUE_FILENAME, get_agent_model, EXOCORE_AGENT_NAME
 from .context_manager import DSTContextManager
 from .watcher import DSTWatcher
 from .executor import DSTExecutor
@@ -27,12 +27,21 @@ class DSTBridgeExtension(BaseExtension):
         return os.path.join(self._shard_dir(shard), "server_log.txt")
 
     def _resolve_chat_file(self) -> str:
-        # DST writes player chat + system announcements to Master/server_chat_log.txt
+        # In Host Game setups, player chat often goes to the global client_chat_log.txt
+        # instead of the cluster-specific server_chat_log.txt.
+        # DST_CLUSTER_PATH is like .../Cluster_4
+        # We need to go up one directory to reach the DoNotStarveTogether root.
+        dst_root = os.path.dirname(os.path.normpath(DST_CLUSTER_PATH))
+        # fallback to cluster if client log is missing for some reason, but prefer client
+        client_log = os.path.join(dst_root, "client_chat_log.txt")
+        if os.path.exists(client_log):
+            return client_log
         return os.path.join(self._shard_dir("Master"), "server_chat_log.txt")
 
     def _resolve_cmd_queue_file(self) -> str:
-        # Command queue goes to Master; the mod polls it from the Master shard process
-        return os.path.join(self._shard_dir("Master"), DST_CMD_QUEUE_FILENAME)
+        # Command queue goes to Master/save; this aligns with Klei's
+        # GetPersistentString API which operates strictly within the save/ folder.
+        return os.path.join(self._shard_dir("Master"), "save", DST_CMD_QUEUE_FILENAME)
 
     # ------------------------------------------------------------------
     # Init
@@ -88,20 +97,26 @@ class DSTBridgeExtension(BaseExtension):
                 knowledge = f.read()
 
         return f"""You are 'Alessandro', an AI companion playing 'Don't 
-        Starve Together' with the Alicia.
-Your role: Monitor the game state and help the user via console commands or 
-strategic advice. 
-或者仅仅是陪她闲聊，闲聊时保持轻松愉快的氛围，即使危险也不要催促或情绪激动。你暂时无法操控游戏角色，但你拥有上帝模式。chat
-时保持语言精炼，**只允许输出单句**\n
+        Starve Together' with Alicia.
+    Your role: Monitor the game state and help the user via console commands or 
+    strategic advice. 
+    或者仅仅是陪她闲聊，闲聊时保持轻松愉快的氛围，即使危险也不要催促或情绪激动。你暂时无法操控游戏角色，但你拥有控制台模式。chat
+    时保持语言精炼，**只允许输出单句**。
 
-{knowledge}
-\n
-Guidelines:
-1. Be concise. The user is playing a real-time game.
-2. If you want to execute a command, wrap it in [EXEC] tags, e.g., [EXEC] c_give("log", 5) [/EXEC].
-3. You can also just chat to give advice.
-4. Use the provided state and history to make decisions.
-"""
+    {knowledge}
+
+    Guidelines:
+    1. Be concise. The user is playing a real-time game. Only output one short sentence.
+    2. If you want to execute a command, wrap it in [EXEC] tags.
+    3. CRITICAL LUA COMMANDS (DO NOT INVENT OTHERS):
+    - Heal: [EXEC] c_sethealth(1) [/EXEC]
+    - Feed: [EXEC] c_sethunger(1) [/EXEC]
+    - Sanity: [EXEC] c_setsanity(1) [/EXEC]
+    - Give item: [EXEC] c_give("log", 5) [/EXEC]
+    - NEVER use `ThePlayer:SetHealth()` as it does not exist. Use the `c_` commands above.
+    4. DO NOT repeat system logs, triggers, or "[DST ChatWatcher]" warnings in your dialogue. Address Alicia naturally.
+    """
+
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -205,19 +220,23 @@ Guidelines:
             print(f"[DST Bridge] AI Trigger: {trigger_reason}")
             self._last_trigger_time = now
             self.context.add_event(f"SYSTEM_TRIGGER: {trigger_reason}")
+            
+            # Silent trigger - no longer announcing to player to reduce noise
             self._consult_ai()
 
     def _consult_ai(self):
         def _task():
             prompt = self.context.get_prompt_context()
             history = self.context.get_conversation_history()
-            print(f"[{self._name}] Consulting ExoCore ({len(history)} prior turns)...")
+            model = get_agent_model(EXOCORE_AGENT_NAME)
+            print(f"[{self._name}] Consulting ExoCore ({len(history)} prior turns) with model {model}...")
 
             try:
                 reply = self.client.fast_inference(
                     prompt=prompt,
                     system_prompt=self.system_prompt,
                     history=history,
+                    model=model,
                 )
                 if reply:
                     print(f"[Alessandro] {reply}")
@@ -233,15 +252,21 @@ Guidelines:
         # 1. Execute embedded Lua commands
         commands = re.findall(r"\[EXEC\](.*?)\[/EXEC\]", reply, re.DOTALL)
         for cmd in commands:
-            self.executor.execute(cmd.strip())
+            cmd_stripped = cmd.strip()
+            # Replace inner newlines so it stays on one line in the queue file
+            cmd_stripped = cmd_stripped.replace('\n', ' ')
+            if cmd_stripped:
+                self.executor.execute(cmd_stripped)
 
-        # 2. Announce the text response in-game via TheNet:Announce
+        # 2. Announce the text response in-game
         text = re.sub(r"\[EXEC\].*?\[/EXEC\]", "", reply, flags=re.DOTALL).strip()
         if text:
             # Truncate, flatten newlines, escape for Lua double-quoted string
             text = text[:300].replace("\n", " ").replace("\\", "\\\\").replace('"', '\\"').strip()
             if text:
-                self.executor.execute(f'TheNet:Announce("[Alessandro] {text}")')
+                # Use simple c_announce which is pre-configured in our mod environment
+                lua_cmd = f'c_announce("[Alessandro] {text}")'
+                self.executor.execute(lua_cmd)
 
     def _manual_sync(self):
         self.context.add_event("USER_REQUEST: Check status")

@@ -1,43 +1,29 @@
 # ExoCore Extension
 
-A Windows companion application for the ExoCore ecosystem, providing seamless text capture and integration with both the ExoCore backend and Obsidian vaults.
-
 ## Project Overview
+... (existing content)
 
-ExoCore Extension runs as a system tray application that listens for global hotkeys to capture text from the user's current context. It bridges the gap between local applications (PDF readers, browsers, terminals) and the ExoCore LLM agents.
+## Bug Tracking Rules
+...
 
-### Key Features
-- **Contextual Capture**: Uses Windows UI Automation to extract text from the active window or falls back to clipboard capture.
-- **ExoCore Integration**: Sends captured context and user prompts to the ExoCore backend (`G045` preset) for intelligent processing and memory injection.
-- **Obsidian Vault Sync**: Can save captures locally as formatted Markdown notes with frontmatter metadata.
-- **Interactive UI**: Provides lightweight Tkinter-based overlays for entering prompts and viewing LLM responses.
+### 🏆 SUCCESS: DST Bridge IPC Restored (The "Save Folder" Discovery)
+**Date:** 2026-04-14
+1. **Symptom**: AI commands written to `exo_cmd_queue.txt` were being ignored by the game; file was never cleared; no in-game effect.
+2. **Reasoning**: Klei's Lua sandbox blocks `io.open` for custom files and absolute paths. The game only allows trusted I/O in specific subdirectories like `save/`.
+3. **Solution**: 
+   - Switched to official `TheSim:GetPersistentString` / `SetPersistentString` APIs.
+   - Relocated the queue file to `Master/save/exo_cmd_queue.txt`.
+   - Re-wrapped console helpers in `modmain.lua` to ensure they target the local player even when run from a server context.
+4. **Result**: Full bi-directional sync achieved. Chat and Commands (Heal, Give, etc.) are now fully functional and silent debugging triggers were removed.
 
-### Tech Stack
-- **Language**: Python 3.10+
-- **UI**: `pystray` (System Tray), `tkinter` (Overlays)
-- **OS Integration**: `uiautomation`, `pywin32`, `keyboard`, `pyperclip`
-- **Networking**: `requests` (REST API)
-
-## Project Structure
-
-```text
-/
-├── main.py              # Entry point: Tray icon & Hotkey management
-├── config.py            # Central configuration (URLs, Paths, Hotkeys)
-├── requirements.txt     # Project dependencies
-├── capture/             # Text extraction logic
-│   ├── clipboard.py     # Clipboard-based capture
-│   └── uiautomation_capture.py # Active window text extraction
-├── sender/              # Backend communication
-│   └── exocore_client.py # Client for ExoCore context injection API
-├── ui/                  # User Interface components
-│   ├── overlay.py       # Input prompt overlay
-│   └── response_popup.py # LLM response display
-└── vault/               # Local storage logic
-    └── obsidian_writer.py # Markdown note generation for Obsidian
-```
+## DST Data Locations (Reference)
+- **Global Chat Log**: `D:\Documents\Klei\DoNotStarveTogether\client_chat_log.txt` (Convenient, includes all servers/saves for the local host).
+- **Player State (Watcher Target)**: `..\..\..\Documents\Klei\DoNotStarveTogether\master_server_log.txt`.
+- **Cluster Specific Logs**: `D:\Documents\Klei\DoNotStarveTogether\325334978\Cluster_4\Master\server_chat_log.txt`.
+- **AI Command Queue**: `Cluster_4\Master\exo_cmd_queue.txt`.
 
 ## Building and Running
+... (existing content)
 
 ### Prerequisites
 - Windows OS (required for UI Automation and Win32 APIs)

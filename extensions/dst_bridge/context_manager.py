@@ -3,7 +3,8 @@ import json
 from datetime import datetime
 
 class DSTContextManager:
-    def __init__(self, max_history=8):
+    # max_history=10 ensures we keep up to 5 full turns (5 user, 5 assistant)
+    def __init__(self, max_history=10):
         self.max_history = max_history
         self.event_log = deque(maxlen=20)       # raw game events for context building
         self.conv_history = deque(maxlen=max_history)  # {"role", "content"} turns for LLM
@@ -32,8 +33,24 @@ class DSTContextManager:
         return context
 
     def get_conversation_history(self) -> list:
-        """Return prior turns as [{"role": ..., "content": ...}] for the API."""
-        return list(self.conv_history)
+        """
+        Return prior turns formatted for the API.
+        Enforces strict alternating roles, starts with 'user', max 10 messages.
+        """
+        raw_history = list(self.conv_history)
+        sanitized = []
+        
+        # Build backwards to keep the most recent pairs intact
+        for msg in reversed(raw_history):
+            expected_role = "user" if not sanitized or sanitized[0]["role"] == "assistant" else "assistant"
+            if msg["role"] == expected_role:
+                sanitized.insert(0, msg)
+        
+        # If the oldest message is 'assistant', drop it so it starts with 'user'
+        if sanitized and sanitized[0]["role"] == "assistant":
+            sanitized.pop(0)
+            
+        return sanitized
 
     def clear(self):
         self.event_log.clear()

@@ -4,16 +4,15 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="准备修正payload 格式">
+    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="对托盘菜单微调">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/GEMINI.md" beforeDir="false" afterPath="$PROJECT_DIR$/GEMINI.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/api_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/api_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/extension.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/extension.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/sender/exocore_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/sender/exocore_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/ui/overlay.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/ui/overlay.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/ui/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/ui/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/dst_bridge/exocore_lite_client.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/dst_bridge/exocore_lite_client.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dst_mod_source/BUGLOG.md" beforeDir="false" afterPath="$PROJECT_DIR$/dst_mod_source/BUGLOG.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dst_mod_source/modmain.lua" beforeDir="false" afterPath="$PROJECT_DIR$/dst_mod_source/modmain.lua" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/dst_bridge/context_manager.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/dst_bridge/context_manager.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/dst_bridge/extension.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/dst_bridge/extension.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/extensions/dst_bridge/knowledge.md" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/dst_bridge/knowledge.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -87,7 +86,7 @@
       <workItem from="1775941113226" duration="2540000" />
       <workItem from="1775997008090" duration="11265000" />
       <workItem from="1776076828967" duration="1313000" />
-      <workItem from="1776078357743" duration="8014000" />
+      <workItem from="1776078357743" duration="16186000" />
     </task>
     <task id="LOCAL-00001" summary="怎么欠了这么多东西">
       <option name="closed" value="true" />
@@ -137,7 +136,15 @@
       <option name="project" value="LOCAL" />
       <updated>1776089964065</updated>
     </task>
-    <option name="localTasksCounter" value="7" />
+    <task id="LOCAL-00007" summary="对托盘菜单微调">
+      <option name="closed" value="true" />
+      <created>1776106019337</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1776106019337</updated>
+    </task>
+    <option name="localTasksCounter" value="8" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -149,6 +156,7 @@
     <MESSAGE value="watcher层级改动到存档级，同时监控地表和洞穴" />
     <MESSAGE value="通讯链路重新接通" />
     <MESSAGE value="准备修正payload 格式" />
-    <option name="LAST_COMMIT_MESSAGE" value="准备修正payload 格式" />
+    <MESSAGE value="对托盘菜单微调" />
+    <option name="LAST_COMMIT_MESSAGE" value="对托盘菜单微调" />
   </component>
 </project>
