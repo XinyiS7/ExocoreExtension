@@ -4,7 +4,8 @@ Endpoint: POST /api/agents/external_context_inject/
 Spec: ExoCore/Plan/ExocoreExtension_Payload_Spec.md
 """
 import requests
-from config import EXOCORE_BASE_URL, EXOCORE_AGENT_NAME, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
+from core.agent_registry import agent_registry
+from config import EXOCORE_BASE_URL, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
 
 # Maps our internal capture method names to API source values
 SOURCE_MAP = {
@@ -15,7 +16,9 @@ SOURCE_MAP = {
 
 
 class ExocoreClient:
-    def __init__(self, base_url: str = EXOCORE_BASE_URL, agent_name: str = EXOCORE_AGENT_NAME):
+    def __init__(self, base_url: str = EXOCORE_BASE_URL, agent_name: str | None = None):
+        if agent_name is None:
+            agent_name = agent_registry.get_default_name()
         self.base_url = base_url.rstrip("/")
         self.agent_name = agent_name
 

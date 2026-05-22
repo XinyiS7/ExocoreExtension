@@ -1,5 +1,5 @@
 import os
-from config import DST_CMD_QUEUE_FILENAME
+from .config import DST_CMD_QUEUE_FILENAME
 
 
 class DSTExecutor:

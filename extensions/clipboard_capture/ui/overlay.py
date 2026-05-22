@@ -5,7 +5,9 @@ Fixed visibility issues by avoiding ttk styles in dark mode.
 import os
 import tkinter as tk
 from tkinter import filedialog
-from config import COLORS, FONTS, VAULT_PATH, EXOCORE_AGENT_NAME, AGENT_CONFIGS
+from core.agent_registry import agent_registry
+from config import COLORS, FONTS
+from ..config import VAULT_PATH
 
 
 def ask_prompt(preview_text: str, source_app: str) -> dict | None:
@@ -116,7 +118,7 @@ def ask_prompt(preview_text: str, source_app: str) -> dict | None:
     agent_frame = tk.Frame(grid, bg=COLORS["bg"])
     agent_frame.grid(row=1, column=1, sticky="w", pady=4)
 
-    agent_var = tk.StringVar(value=EXOCORE_AGENT_NAME)
+    agent_var = tk.StringVar(value=agent_registry.get_default_name())
     agent_entry = tk.Entry(agent_frame, textvariable=agent_var, bg=COLORS["surface"], fg=COLORS["accent"], font=FONTS["sans"], relief="flat", width=12, insertbackground=COLORS["accent"])
     agent_entry.pack(side="left")
 
@@ -124,14 +126,11 @@ def ask_prompt(preview_text: str, source_app: str) -> dict | None:
     
     def on_agent_selected(val):
         agent_var.set(val)
-        # Update mode if agent is known
-        from config import AGENT_CONFIGS
-        for cfg in AGENT_CONFIGS:
-            if cfg["name"] == val:
-                mode_var.set(cfg.get("mode", "zero_tool"))
-                break
+        cfg = agent_registry.get_agent_config(val)
+        if cfg:
+            mode_var.set(cfg.get("mode", "zero_tool"))
 
-    _agent_names = [cfg["name"] for cfg in AGENT_CONFIGS]
+    _agent_names = agent_registry.list_names()
     agent_opt = tk.OptionMenu(agent_frame, agent_var, *_agent_names, command=on_agent_selected)
     agent_opt.config(bg=COLORS["panel"], fg=COLORS["text"], font=("Arial", 8), relief="flat", highlightthickness=0, width=1)
     agent_opt["menu"].config(bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["sans"])

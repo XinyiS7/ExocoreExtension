@@ -9,14 +9,14 @@ from .ui.overlay import ask_prompt
 from .ui.response_popup import show_response
 from .ui.settings import show_settings
 from .vault.obsidian_writer import save_note, append_reply
+from core.agent_registry import agent_registry
 from core.api_client import ExocoreClient
 from core.base_extension import BaseExtension
-from config import (
+from config import get_agent_mode
+from .config import (
     HOTKEY_CLIPBOARD_CAPTURE,
     HOTKEY_UI_CAPTURE,
     CLIPBOARD_FALLBACK,
-    AGENT_CONFIGS,
-    get_agent_mode,
 )
 
 class ClipboardCaptureExtension(BaseExtension):
@@ -61,9 +61,9 @@ class ClipboardCaptureExtension(BaseExtension):
         agent_mode = result.get("mode", "zero_tool")
 
         # Persist new agent name to config if not already known
-        known_names = [cfg["name"] for cfg in AGENT_CONFIGS]
+        known_names = agent_registry.list_names()
         if agent_name and agent_name not in known_names:
-            self._persist_agent(agent_name, agent_mode)
+            agent_registry.add_agent(agent_name, agent_mode)
 
         client = ExocoreClient(agent_name=agent_name)
 
@@ -99,7 +99,7 @@ class ClipboardCaptureExtension(BaseExtension):
                 g045_reply = resp.get("reply", "(no reply returned)")
                 
                 try:
-                    from config import VAULT_PATH
+                    from .config import VAULT_PATH
                     base_path = result.get("vault_path") or VAULT_PATH
                     append_reply(note_path, base_path, custom_title, agent_name, g045_reply)
                     print(f"[ExoCore] Reply automatically appended via title '{custom_title}'")
@@ -117,40 +117,9 @@ class ClipboardCaptureExtension(BaseExtension):
             except Exception as e:
                 print(f"[ExoCore] API Error: {e}", file=sys.stderr)
 
-    def _persist_agent(self, agent_name: str, mode: str = "zero_tool"):
-        try:
-            import os, re
-            # Find config.py by climbing up
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            config_path = None
-            for _ in range(5):
-                candidate = os.path.join(base_dir, "config.py")
-                if os.path.exists(candidate):
-                    config_path = candidate
-                    break
-                base_dir = os.path.dirname(base_dir)
-            
-            if not config_path:
-                print("[ExoCore] Could not locate config.py for persisting agent.")
-                return
-
-            with open(config_path, "r", encoding="utf-8") as f:
-                content = f.read()
-            
-            # Update local AGENT_CONFIGS as well
-            AGENT_CONFIGS.append({"name": agent_name, "mode": mode})
-            new_str = repr(AGENT_CONFIGS)
-            content = re.sub(
-                r'AGENT_CONFIGS\s*=\s*\[.*?\]',
-                f'AGENT_CONFIGS = {new_str}',
-                content,
-                flags=re.DOTALL,
-            )
-            with open(config_path, "w", encoding="utf-8") as f:
-                f.write(content)
-            print(f"[ExoCore] New agent '{agent_name}' with mode '{mode}' added to persistent config.")
-        except Exception as e:
-            print(f"[ExoCore] Failed to persist new agent: {e}")
+    def get_settings_ui(self):
+        from .ui.settings import show_settings
+        return show_settings
 
     def on_clipboard_hotkey(self):
         threading.Thread(target=lambda: self.handle_capture(capture_selected_text()), daemon=True).start()

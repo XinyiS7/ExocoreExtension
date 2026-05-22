@@ -6,7 +6,7 @@ import os
 import re
 import uuid
 from datetime import datetime
-from config import VAULT_PATH
+from ..config import VAULT_PATH
 
 
 NOTE_TYPES = ("reading_note", "debug_session")

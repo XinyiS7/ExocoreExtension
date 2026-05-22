@@ -50,7 +50,7 @@ def _make_tray_icon() -> Image.Image:
 
 def main():
     extensions = _get_extensions()
-    
+
     for ext in extensions:
         print(f"[ExoCore] Starting extension: {ext.name}")
         ext.start()
@@ -60,13 +60,17 @@ def main():
             ext.stop()
         icon.stop()
 
-    from extensions.clipboard_capture.ui.settings import show_settings
+    # Build menu — discover settings UI from the first extension that provides one
+    menu_items = []
+    for ext in extensions:
+        settings_ui = ext.get_settings_ui()
+        if settings_ui is not None:
+            menu_items.append(
+                pystray.MenuItem("Settings...", lambda icon, item, ui=settings_ui: threading.Thread(target=ui, daemon=True).start())
+            )
+            menu_items.append(pystray.Menu.SEPARATOR)
+            break
 
-    # Build menu
-    menu_items = [
-        pystray.MenuItem("Settings...", lambda icon, item: threading.Thread(target=show_settings, daemon=True).start()),
-        pystray.Menu.SEPARATOR,
-    ]
     for ext in extensions:
         menu_items.extend(ext.get_menu_items())
         menu_items.append(pystray.Menu.SEPARATOR)

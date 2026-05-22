@@ -1,5 +1,6 @@
 import requests
-from config import EXOCORE_BASE_URL, EXOCORE_AGENT_NAME, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
+from core.agent_registry import agent_registry
+from config import EXOCORE_BASE_URL, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
 
 
 class ExocoreLiteClient:
@@ -38,7 +39,7 @@ class ExocoreLiteClient:
             history:       Prior turns as [{"role": "user"|"assistant", "content": "..."}].
                            Current prompt is appended as the final user turn.
         """
-        resolved_agent = agent_name or EXOCORE_AGENT_NAME
+        resolved_agent = agent_name or agent_registry.get_default_name()
 
         messages = list(history) if history else []
         messages.append({"role": "user", "content": prompt})

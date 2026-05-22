@@ -1,52 +1,27 @@
 """
-ExocoreExtension configuration.
+ExoCoreExtension — core configuration.
+
+Extension-specific settings have moved to per-extension config modules
+(Phase 2 split). The two path values below are retained as duplication
+for backward compatibility with the Settings UI regex-based save; they
+will be removed in Phase 4 when each extension manages its own paths.
+
+Agent configuration is managed by core.agent_registry (Phase 1).
 """
 
-# DST Bridge — active cluster directory (change when switching saves)
-# e.g. r"D:\Documents\Klei\DoNotStarveTogether\<SteamID>\Cluster_4"
-DST_CLUSTER_PATH = r"D:\Documents\Klei\DoNotStarveTogether\325334978\Cluster_4"
+# ---------------------------------------------------------------------------
+# ExoCore backend (shared by all extensions)
+# ---------------------------------------------------------------------------
 
-# Queue file sits in the active shard's Master/ folder
-# Resolved at runtime by DSTBridgeExtension._resolve_cmd_queue_file()
-DST_CMD_QUEUE_FILENAME = "exo_cmd_queue.txt"
-
-# ExoCore backend
 EXOCORE_BASE_URL = "http://127.0.0.1:8000"
 EXOCORE_API_KEY = ""
-EXOCORE_ADMIN_KEY = "alessandro_root_045"        # Matches settings.ADMIN_TRIGGER_KEY  (admin override)
-EXOCORE_EXTENSION_KEY = "exocore_pollux"    # Matches EXTENSION_SECRET in
-# ExoCore .env (per-extension token)
-EXOCORE_AGENT_NAME = "Alessandro"  # Default agent
-AGENT_CONFIGS = [{'name': 'Alessandro', 'mode': 'lite_private', 'model': 'gemini-2.5-flash'}]
+EXOCORE_ADMIN_KEY = "alessandro_root_045"
+EXOCORE_EXTENSION_KEY = "exocore_pollux"
 
+# ---------------------------------------------------------------------------
+# UI theme (shared by all extensions)
+# ---------------------------------------------------------------------------
 
-def get_agent_config(name: str) -> dict:
-    """Return the full config dict for the given agent name."""
-    for cfg in AGENT_CONFIGS:
-        if cfg["name"] == name:
-            return cfg
-    return {}
-
-
-def get_agent_mode(name: str) -> str:
-    return get_agent_config(name).get("mode", "zero_tool")
-
-
-def get_agent_model(name: str) -> str:
-    return get_agent_config(name).get("model", "")
-
-# Obsidian vault
-VAULT_PATH = r"D:/Alicia/Tales-on-leaves/壁炉书房/读书笔记"
-
-# Hotkeys
-HOTKEY_CLIPBOARD_CAPTURE = "ctrl+alt+a"
-HOTKEY_UI_CAPTURE = "ctrl+alt+s"
-
-# Capture settings
-CLIPBOARD_FALLBACK = True
-MAX_CAPTURE_CHARS = 8000
-
-# UI Visual Theme
 COLORS = {
     "bg": "#080A0F",
     "panel": "#1A1E29",
@@ -61,3 +36,44 @@ FONTS = {
     "mono": ("JetBrains Mono", 11),
     "title": ("Outfit", 14, "bold"),
 }
+
+# ---------------------------------------------------------------------------
+# Agent registry delegation (Phase 1 — thread-safe, JSON-backed)
+# ---------------------------------------------------------------------------
+
+from core.agent_registry import agent_registry  # noqa: E402
+
+
+def _default_agent_name() -> str:
+    return agent_registry.get_default_name()
+
+
+EXOCORE_AGENT_NAME = _default_agent_name()
+
+
+def _get_configs() -> list[dict]:
+    return agent_registry.get_all()
+
+
+AGENT_CONFIGS = _get_configs()
+
+
+def get_agent_config(name: str) -> dict:
+    return agent_registry.get_agent_config(name)
+
+
+def get_agent_mode(name: str) -> str:
+    return agent_registry.get_agent_mode(name)
+
+
+def get_agent_model(name: str) -> str:
+    return agent_registry.get_agent_model(name)
+
+
+# ---------------------------------------------------------------------------
+# Path values — duplicated from per-extension configs for backward compat
+# with the Settings UI regex-based save.  Remove in Phase 4.
+# ---------------------------------------------------------------------------
+
+VAULT_PATH = r"D:/Alicia/Tales-on-leaves/壁炉书房/读书笔记"
+DST_CLUSTER_PATH = r"D:\Documents\Klei\DoNotStarveTogether\325334978\Cluster_4"

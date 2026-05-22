@@ -7,7 +7,10 @@ from tkinter import filedialog, messagebox
 import re
 import os
 import sys
-from config import COLORS, FONTS, VAULT_PATH, EXOCORE_AGENT_NAME, AGENT_CONFIGS, DST_CLUSTER_PATH
+from core.agent_registry import agent_registry
+from config import COLORS, FONTS
+from ..config import VAULT_PATH
+from extensions.dst_bridge.config import DST_CLUSTER_PATH
 
 MODE_OPTIONS = ["zero_tool", "lite_private", "special_extend", "grounding"]
 
@@ -55,7 +58,7 @@ def show_settings():
     scrollbar.pack(side="right", fill="y")
 
     # Deep-copy so edits don't mutate live config until Save
-    current_configs = [dict(cfg) for cfg in AGENT_CONFIGS]
+    current_configs = agent_registry.get_all()
 
     def refresh_agents():
         for widget in agent_container.winfo_children():
@@ -95,7 +98,8 @@ def show_settings():
     # Default Agent
     tk.Label(main, text="DEFAULT AGENT", anchor="w", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).pack(anchor="w", pady=(0, 5))
     agent_names = [cfg["name"] for cfg in current_configs]
-    default_val = EXOCORE_AGENT_NAME if EXOCORE_AGENT_NAME in agent_names else (agent_names[0] if agent_names else "")
+    default_name = agent_registry.get_default_name()
+    default_val = default_name if default_name in agent_names else (agent_names[0] if agent_names else "")
     agent_var = tk.StringVar(value=default_val)
     
     agent_menu_frame = tk.Frame(main, bg=COLORS["bg"])
@@ -150,9 +154,14 @@ def show_settings():
 
         new_vault = vault_var.get().replace("\\", "/")
         new_dst = dst_var.get().replace("\\", "/")
-        agent_configs_str = repr(current_configs)
 
         try:
+            # Agent configs — persisted atomically via the registry (no regex)
+            agent_registry.replace_all(current_configs)
+            agent_registry.set_default_agent(new_agent)
+
+            # Path configs — still edited in config.py (moved to per-extension
+            # config files in Phase 2)
             base_dir = os.path.dirname(os.path.abspath(__file__))
             config_path = None
             for _ in range(5):
@@ -161,21 +170,13 @@ def show_settings():
                     config_path = candidate
                     break
                 base_dir = os.path.dirname(base_dir)
-            
+
             if not config_path:
                 raise FileNotFoundError("Could not locate config.py")
 
             with open(config_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            content = re.sub(r'EXOCORE_AGENT_NAME\s*=\s*".*?"', f'EXOCORE_AGENT_NAME = "{new_agent}"', content)
-            content = re.sub(
-                r'AGENT_CONFIGS\s*=\s*\[.*?\]',
-                f'AGENT_CONFIGS = {agent_configs_str}',
-                content,
-                flags=re.DOTALL,
-            )
-            
             # VAULT_PATH
             if 'VAULT_PATH = r"' in content:
                 content = re.sub(r'VAULT_PATH\s*=\s*r".*?"', f'VAULT_PATH = r"{new_vault}"', content)

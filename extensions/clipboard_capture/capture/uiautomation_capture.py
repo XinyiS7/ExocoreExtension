@@ -7,7 +7,7 @@ Supported apps: Adobe/Sumatra PDF, browsers, standard Win32 apps.
 Falls back gracefully for canvas-rendered or non-accessible apps.
 """
 import uiautomation as auto
-from config import MAX_CAPTURE_CHARS
+from ..config import MAX_CAPTURE_CHARS
 
 
 def capture_active_window_text() -> str | None:
