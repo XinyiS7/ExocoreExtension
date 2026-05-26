@@ -31,8 +31,15 @@ class CacheManager:
 
     def load(self, filepath: str) -> str:
         """Read a cache file back into memory."""
+        # Path-safety check: ensure filepath is within the cache root
+        abs_filepath = os.path.abspath(filepath)
+        abs_root = os.path.abspath(self._root)
+        if os.path.commonpath([abs_filepath, abs_root]) != abs_root:
+            raise ValueError(
+                f"File path {filepath} is outside cache root {self._root}"
+            )
         if not os.path.exists(filepath):
-            return ""
+            raise FileNotFoundError(f"Cache file not found: {filepath}")
         with open(filepath, "r", encoding="utf-8") as f:
             return f.read()
 
@@ -43,6 +50,8 @@ class CacheManager:
         now = time.time()
         removed = 0
         for fname in os.listdir(self._root):
+            if not (fname.startswith("pane_") and fname.endswith(".log")):
+                continue
             fpath = os.path.join(self._root, fname)
             if not os.path.isfile(fpath):
                 continue
