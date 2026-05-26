@@ -21,6 +21,7 @@ class AgentRegistry:
         self._lock = threading.Lock()
         self._path = os.path.join(storage_dir, _STORAGE_FILENAME)
         self._configs: list[dict] = []
+        self._assignments: dict[str, str] = {}
         self._load()
 
     # ------------------------------------------------------------------
@@ -53,6 +54,29 @@ class AgentRegistry:
     def list_names(self) -> list[str]:
         with self._lock:
             return [cfg["name"] for cfg in self._configs]
+
+    # ------------------------------------------------------------------
+    # Extension assignment API
+    # ------------------------------------------------------------------
+
+    def get_extension_agent(self, extension_name: str) -> str | None:
+        """Return the agent assigned to an extension, or None."""
+        with self._lock:
+            return self._assignments.get(extension_name)
+
+    def set_extension_agent(self, extension_name: str, agent_name: str) -> None:
+        """Assign an agent to an extension. Empty string clears the assignment."""
+        with self._lock:
+            if agent_name:
+                self._assignments[extension_name] = agent_name
+            else:
+                self._assignments.pop(extension_name, None)
+            self._persist()
+
+    def get_all_extension_assignments(self) -> dict[str, str]:
+        """Return a copy of all extension->agent assignments."""
+        with self._lock:
+            return dict(self._assignments)
 
     # ------------------------------------------------------------------
     # Public write API
@@ -111,8 +135,13 @@ class AgentRegistry:
         """Write to a temp file and atomically rename to avoid corruption."""
         tmp = self._path + ".tmp"
         try:
+            payload = {
+                "version": 2,
+                "agents": [dict(cfg) for cfg in self._configs],
+                "extension_assignments": dict(self._assignments),
+            }
             with open(tmp, "w", encoding="utf-8") as f:
-                json.dump(self._configs, f, indent=2, ensure_ascii=False)
+                json.dump(payload, f, indent=2, ensure_ascii=False)
             os.replace(tmp, self._path)
         except Exception as e:
             print(f"[AgentRegistry] Failed to persist: {e}")
@@ -121,9 +150,20 @@ class AgentRegistry:
         if os.path.exists(self._path):
             try:
                 with open(self._path, "r", encoding="utf-8") as f:
-                    self._configs = json.load(f)
+                    data = json.load(f)
+                if isinstance(data, list):
+                    # Old v1 format — migrate
+                    self._configs = data
+                    self._assignments = {}
+                    self._persist()
+                elif isinstance(data, dict) and "version" in data:
+                    # New v2 format
+                    self._configs = data.get("agents", [])
+                    self._assignments = data.get("extension_assignments", {})
+                else:
+                    raise ValueError("Unknown JSON structure")
                 return
-            except (json.JSONDecodeError, OSError) as e:
+            except (json.JSONDecodeError, OSError, ValueError) as e:
                 print(f"[AgentRegistry] Corrupt JSON, falling back to config.py: {e}")
 
         self._migrate_from_config()
@@ -131,6 +171,7 @@ class AgentRegistry:
     def _migrate_from_config(self) -> None:
         """First-run: seed with the default agent (avoids circular import from config)."""
         self._configs = [{"name": "Alessandro", "mode": "lite_private", "model": "gemini-2.5-flash"}]
+        self._assignments = {}
         self._persist()
         print(f"[AgentRegistry] No JSON found — seeded with default agent")
 
