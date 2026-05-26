@@ -12,7 +12,6 @@ Launch inside a WezTerm pane:
     python sandro_tui.py
 """
 import os
-import sys
 import json
 import requests
 from prompt_toolkit import PromptSession
