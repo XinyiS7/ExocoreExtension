@@ -128,17 +128,15 @@ class WezBridgeExtension(BaseExtension):
             from core.api_client import ExocoreClient
             client = ExocoreClient(agent_name=self.get_assigned_agent_name())
             client.inject_context(
-                captured_text=f"[Sentinel Alert] Pane {pane_id}: {snippet}",
+                captured_text=(
+                    f"[Sentinel Alert] Pane {pane_id}: {snippet}\n"
+                    f"Cache: {cache_path}"
+                ),
                 user_prompt="",
                 capture_method="terminal",
-                target_storage="session_memory",
-                mode="agent_audit",
+                target_storage="external_session",
+                mode="special_extend",
                 custom_title=f"Pane {pane_id} Error State",
-                metadata={
-                    "pane_id": pane_id,
-                    "current_dir": "",
-                    "cache_file_reference": cache_path,
-                },
             )
             print(f"[{self._name}] Context injected to ExoCore for pane {pane_id}")
         except Exception as e:

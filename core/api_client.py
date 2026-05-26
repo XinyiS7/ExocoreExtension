@@ -13,7 +13,7 @@ from config import EXOCORE_BASE_URL, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
 SOURCE_MAP = {
     "clipboard": "clipboard",
     "uiautomation": "uiautomation",
-    "terminal": "terminal_bridge",
+    "terminal": "terminal",
 }
 
 
