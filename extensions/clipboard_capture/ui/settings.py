@@ -95,6 +95,43 @@ def show_settings():
 
     refresh_agents()
 
+    # Add New Agent
+    add_frame = tk.Frame(main, bg=COLORS["surface"], padx=6, pady=6)
+    add_frame.pack(fill="x", pady=(0, 10))
+
+    tk.Label(add_frame, text="New", bg=COLORS["surface"], fg=COLORS["muted"],
+             font=FONTS["sans"]).pack(side="left", padx=(2, 6))
+
+    new_name_var = tk.StringVar()
+    new_name_entry = tk.Entry(add_frame, textvariable=new_name_var, width=14,
+                              bg=COLORS["panel"], fg=COLORS["text"],
+                              font=FONTS["sans"], relief="flat")
+    new_name_entry.pack(side="left", padx=(0, 6))
+
+    new_mode_var = tk.StringVar(value="zero_tool")
+    new_mode_menu = tk.OptionMenu(add_frame, new_mode_var, *MODE_OPTIONS)
+    new_mode_menu.config(bg=COLORS["panel"], fg=COLORS["text"], font=FONTS["sans"],
+                         relief="flat", highlightthickness=0, width=12)
+    new_mode_menu["menu"].config(bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["sans"])
+    new_mode_menu.pack(side="left", padx=(0, 6))
+
+    def add_agent():
+        name = new_name_var.get().strip()
+        if not name:
+            messagebox.showwarning("Invalid", "Agent name cannot be empty.", parent=root)
+            return
+        if name in [c["name"] for c in current_configs]:
+            messagebox.showwarning("Duplicate", f"Agent '{name}' already exists.", parent=root)
+            return
+        current_configs.append({"name": name, "mode": new_mode_var.get()})
+        new_name_var.set("")
+        new_mode_var.set("zero_tool")
+        refresh_agents()
+
+    tk.Button(add_frame, text="Add", command=add_agent,
+              bg=COLORS["accent"], fg=COLORS["bg"],
+              font=FONTS["sans"], relief="flat", padx=10).pack(side="right")
+
     # Default Agent
     tk.Label(main, text="DEFAULT AGENT", anchor="w", bg=COLORS["bg"], fg=COLORS["muted"], font=FONTS["sans"]).pack(anchor="w", pady=(0, 5))
     agent_names = [cfg["name"] for cfg in current_configs]
