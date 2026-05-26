@@ -7,6 +7,7 @@ import pkgutil
 import threading
 
 from core.base_extension import BaseExtension
+from core.agent_registry import agent_registry
 from config import COLORS, EXOCORE_AGENT_NAME
 
 def _get_extensions() -> list[BaseExtension]:
@@ -54,6 +55,23 @@ def main():
     for ext in extensions:
         print(f"[ExoCore] Starting extension: {ext.name}")
         ext.start()
+
+    # Print extension → agent assignment summary
+    print(f"\n[ExoCore] Extension Agent Assignments:")
+    global_default = agent_registry.get_default_name()
+    for ext in extensions:
+        assigned = agent_registry.get_extension_agent(ext.name)
+        if assigned:
+            source = "registry override"
+            agent = assigned
+        elif hasattr(ext, 'default_agent') and ext.default_agent:
+            source = "config default"
+            agent = ext.default_agent
+        else:
+            source = "global default"
+            agent = global_default
+        print(f"  {ext.name:<24} → {agent:<16} ({source})")
+    print()
 
     def on_quit(icon):
         for ext in extensions:
