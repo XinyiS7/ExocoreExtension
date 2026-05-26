@@ -27,6 +27,22 @@ class TestListPanes:
             panes = cli.list_panes()
             assert panes == []
 
+    def test_list_panes_returns_empty_on_file_not_found(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("wezterm not installed")
+            cli = WezTermCLI()
+            panes = cli.list_panes()
+            assert panes == []
+
+    def test_list_panes_returns_empty_on_malformed_json(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="not valid json {{{", stderr=""
+            )
+            cli = WezTermCLI()
+            panes = cli.list_panes()
+            assert panes == []
+
 
 class TestGetText:
     def test_get_text_returns_stdout(self):
@@ -56,6 +72,13 @@ class TestGetText:
             text = cli.get_text(pane_id=1)
             assert text == ""
 
+    def test_get_text_returns_empty_on_file_not_found(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("wezterm not installed")
+            cli = WezTermCLI()
+            text = cli.get_text(pane_id=1)
+            assert text == ""
+
 
 class TestSendText:
     def test_send_text_no_newline(self):
@@ -76,6 +99,13 @@ class TestSendText:
             result = cli.send_text(pane_id=2, text="bad")
             assert result is False
 
+    def test_send_text_returns_false_on_file_not_found(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = FileNotFoundError("wezterm not installed")
+            cli = WezTermCLI()
+            result = cli.send_text(pane_id=2, text="cmd")
+            assert result is False
+
 
 class TestSendEnter:
     def test_send_enter(self):
@@ -84,3 +114,40 @@ class TestSendEnter:
             cli = WezTermCLI()
             result = cli.send_enter(pane_id=2)
             assert result is True
+
+
+class TestGetHostPaneId:
+    def test_returns_active_pane_id(self):
+        mock_output = json.dumps([
+            {"pane_id": 0, "title": "Alessandro TUI", "is_active": True},
+            {"pane_id": 1, "title": "workspace", "is_active": False},
+        ])
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout=mock_output, stderr=""
+            )
+            cli = WezTermCLI()
+            result = cli.get_host_pane_id()
+            assert result == "0"
+
+    def test_falls_back_to_first_pane_when_none_active(self):
+        mock_output = json.dumps([
+            {"pane_id": 3, "title": "idle", "is_active": False},
+            {"pane_id": 5, "title": "also idle", "is_active": False},
+        ])
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout=mock_output, stderr=""
+            )
+            cli = WezTermCLI()
+            result = cli.get_host_pane_id()
+            assert result == "3"
+
+    def test_returns_none_when_no_panes(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout="[]", stderr=""
+            )
+            cli = WezTermCLI()
+            result = cli.get_host_pane_id()
+            assert result is None
