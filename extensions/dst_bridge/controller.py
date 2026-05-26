@@ -44,6 +44,7 @@ class DSTController:
         executor,
         api_client,
         knowledge_file: str,
+        agent_name: str = "",
     ):
         self.context = context_manager
         self.executor = executor
@@ -64,6 +65,7 @@ class DSTController:
 
         # Lazy-loaded system prompt
         self._system_prompt: str = ""
+        self._agent_name = agent_name
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -216,7 +218,8 @@ class DSTController:
         def _task():
             prompt = self.context.get_prompt_context()
             history = self.context.get_conversation_history()
-            model = agent_registry.get_agent_model(agent_registry.get_default_name())
+            agent_name = self._agent_name or agent_registry.get_default_name()
+            model = agent_registry.get_agent_model(agent_name)
             print(f"[DSTController] Consulting ExoCore ({len(history)} prior turns, "
                   f"reason: {reason}) with model {model}...")
 
@@ -226,6 +229,7 @@ class DSTController:
                     system_prompt=self._system_prompt,
                     history=history,
                     model=model,
+                    agent_name=self._agent_name,
                 )
                 if reply:
                     # Guard: don't store error strings as AI replies

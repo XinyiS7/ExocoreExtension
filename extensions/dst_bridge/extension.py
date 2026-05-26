@@ -14,7 +14,7 @@ import os
 from pystray import MenuItem
 from core.event_bus import event_bus
 from core.base_extension import BaseExtension
-from .config import DST_CLUSTER_PATH, DST_CMD_QUEUE_FILENAME
+from .config import DST_CLUSTER_PATH, DST_CMD_QUEUE_FILENAME, DEFAULT_AGENT
 from .context_manager import DSTContextManager
 from .watcher import DSTWatcher
 from .executor import DSTExecutor
@@ -51,6 +51,7 @@ class DSTBridgeExtension(BaseExtension):
 
     def __init__(self):
         self._name = "DST Bridge"
+        self.default_agent = DEFAULT_AGENT
         knowledge_file = os.path.join(os.path.dirname(__file__), "knowledge.md")
 
         # Shared services
@@ -65,6 +66,7 @@ class DSTBridgeExtension(BaseExtension):
             executor=executor,
             api_client=client,
             knowledge_file=knowledge_file,
+            agent_name=self.get_assigned_agent_name(),
         )
         self.context = context  # exposed for tray menu "Clear DST Context"
 

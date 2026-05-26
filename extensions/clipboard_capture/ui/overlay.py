@@ -118,7 +118,8 @@ def ask_prompt(preview_text: str, source_app: str) -> dict | None:
     agent_frame = tk.Frame(grid, bg=COLORS["bg"])
     agent_frame.grid(row=1, column=1, sticky="w", pady=4)
 
-    agent_var = tk.StringVar(value=agent_registry.get_default_name())
+    _assigned = agent_registry.get_extension_agent("Clipboard Capture") or agent_registry.get_default_name()
+    agent_var = tk.StringVar(value=_assigned)
     agent_entry = tk.Entry(agent_frame, textvariable=agent_var, bg=COLORS["surface"], fg=COLORS["accent"], font=FONTS["sans"], relief="flat", width=12, insertbackground=COLORS["accent"])
     agent_entry.pack(side="left")
 

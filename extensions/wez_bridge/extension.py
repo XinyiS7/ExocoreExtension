@@ -11,7 +11,7 @@ from .cache_manager import CacheManager
 from .sentinel import Sentinel
 from .commander import Commander
 from .local_server import LocalCommandServer
-from .config import AGENT_NAME
+from .config import DEFAULT_AGENT
 
 
 class WezBridgeExtension(BaseExtension):
@@ -19,6 +19,7 @@ class WezBridgeExtension(BaseExtension):
 
     def __init__(self):
         self._name = "WezTerm Bridge"
+        self.default_agent = DEFAULT_AGENT
 
         # Shared WezTerm CLI instance
         self._cli = WezTermCLI()
@@ -125,7 +126,7 @@ class WezBridgeExtension(BaseExtension):
         """Forward a sentinel alert to ExoCore via external_context_inject."""
         try:
             from core.api_client import ExocoreClient
-            client = ExocoreClient(agent_name=AGENT_NAME)
+            client = ExocoreClient(agent_name=self.get_assigned_agent_name())
             client.inject_context(
                 captured_text=f"[Sentinel Alert] Pane {pane_id}: {snippet}",
                 user_prompt="",
