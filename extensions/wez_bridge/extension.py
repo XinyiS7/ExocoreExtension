@@ -50,7 +50,6 @@ class WezBridgeExtension(BaseExtension):
     def start(self):
         if self._started:
             return
-        self._started = True
 
         print(f"[{self._name}] Starting components...")
 
@@ -66,6 +65,7 @@ class WezBridgeExtension(BaseExtension):
         # 3. Start the sentinel (background pane monitor)
         self._sentinel.start()
 
+        self._started = True
         print(f"[{self._name}] All components started. "
               f"Server: {self._server.address}")
 
