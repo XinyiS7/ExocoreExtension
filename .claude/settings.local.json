@@ -13,7 +13,31 @@
       "Bash(tmux-bridge message:*)",
       "Bash(tmux-bridge keys:*)",
       "Bash(grep -r \"D:\\\\\\\\\\\\\\\\Alicia\\\\|/Alicia/\\\\|ExoCore\\\\|exocore-ui\" D:/Alicia/ExocoreExtension --include=\"*.py\" --include=\"*.lua\" --include=\"*.json\" -l)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "PowerShell(Get-ChildItem -Recurse -File -Name | Where-Object { $_ -notmatch '__pycache__|\\\\.pyc$|\\\\.idea|\\\\.venv|\\\\.git' } | Sort-Object)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('core/agent_registry.py'\\).read\\(\\)\\); print\\('agent_registry.py: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('config.py'\\).read\\(\\)\\); print\\('config.py: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('main.py'\\).read\\(\\)\\); print\\('main.py: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('core/base_extension.py'\\).read\\(\\)\\); print\\('base_extension.py: OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('extensions/clipboard_capture/extension.py'\\).read\\(\\)\\); print\\('clipboard extension: OK'\\)\")",
+      "Bash(Remove-Item -Force agent_registry.json -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Force agent_registry.json.tmp -ErrorAction SilentlyContinue)",
+      "PowerShell(git add *)",
+      "Bash(Get-Content *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension\" -Depth 0)",
+      "Bash(Format-Table Name, Mode, Length)",
+      "PowerShell(python --version; python -m pytest --version)",
+      "PowerShell(pip install *)",
+      "Bash(mkdir -p extensions/wez_bridge)",
+      "Bash(mkdir -p tests/wez_bridge)",
+      "Bash(python *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "PowerShell(git rm *)",
+      "Bash(Get-ChildItem -Recurse -Depth 2 D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension)",
+      "Bash(Select-Object FullName)",
+      "Bash(Select-String -Pattern \"spec\")",
+      "Bash(Select-Object -First 30)"
     ]
   }
 }
