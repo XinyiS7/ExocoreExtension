@@ -83,8 +83,12 @@ def main():
     for ext in extensions:
         settings_ui = ext.get_settings_ui()
         if settings_ui is not None:
+            def _make_settings_action(ui):
+                def _action(icon, item):
+                    threading.Thread(target=ui, daemon=True).start()
+                return _action
             menu_items.append(
-                pystray.MenuItem("Settings...", lambda icon, item, ui=settings_ui: threading.Thread(target=ui, daemon=True).start())
+                pystray.MenuItem("Settings...", _make_settings_action(settings_ui))
             )
             menu_items.append(pystray.Menu.SEPARATOR)
             break
