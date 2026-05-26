@@ -49,3 +49,4 @@ class TestCommander:
         panes = cmdr.list_panes()
 
         assert len(panes) == 2
+        mock_cli.list_panes.assert_called_once()
