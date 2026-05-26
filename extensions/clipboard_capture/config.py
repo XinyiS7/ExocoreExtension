@@ -15,3 +15,7 @@ MAX_CAPTURE_CHARS = 8000
 
 # Obsidian vault
 VAULT_PATH = r"D:/Alicia/Tales-on-leaves/壁炉书房/读书笔记"
+
+# Per-extension default agent. Can be overridden via agent_registry.json
+# "extension_assignments" or via Extension Manager.
+DEFAULT_AGENT = "Alessandro"

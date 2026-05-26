@@ -54,5 +54,8 @@ LOCAL_SERVER_PORT = 8777
 # ---------------------------------------------------------------------------
 # ExoCore agent binding
 # ---------------------------------------------------------------------------
-AGENT_NAME = "Alessandro"
+# Per-extension default agent. Can be overridden via agent_registry.json
+# "extension_assignments" or via Extension Manager.
+DEFAULT_AGENT = "Alessandro"
+AGENT_NAME = DEFAULT_AGENT  # backward compat — prefer DEFAULT_AGENT
 AGENT_ID = "G045"

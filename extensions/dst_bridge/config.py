@@ -12,3 +12,7 @@ DST_CLUSTER_PATH = r"D:\Documents\Klei\DoNotStarveTogether\325334978\Cluster_4"
 # Queue file sits in the active shard's Master/save/ folder
 # Resolved at runtime by DSTBridgeExtension._resolve_cmd_queue_file()
 DST_CMD_QUEUE_FILENAME = "exo_cmd_queue.txt"
+
+# Per-extension default agent. Can be overridden via agent_registry.json
+# "extension_assignments" or via Extension Manager.
+DEFAULT_AGENT = "Alessandro"
