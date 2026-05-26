@@ -37,6 +37,7 @@ class Sentinel:
         self._thread: threading.Thread | None = None
         self._running = False
         self._last_text: dict[str, str] = {}  # pane_id -> last seen text
+        self._seen_panes: set[str] = set()  # pane_ids seen at least once
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -90,6 +91,7 @@ class Sentinel:
                 if self._on_alert:
                     self._on_alert(pid, cache_path, snippet)
 
+            self._seen_panes.add(pid)
             self._last_text[pid] = text
 
     # ------------------------------------------------------------------
@@ -106,11 +108,13 @@ class Sentinel:
             return True
 
         # If previously low-entropy (quiet) and now high-entropy (error dump),
-        # consider it a possible crash report
-        was_quiet = self.is_low_entropy(last)
-        is_noisy = not self.is_low_entropy(text)
-        if was_quiet and is_noisy:
-            return True
+        # consider it a possible crash report.  Skip on first sight to avoid
+        # false alerts from the initial poll.
+        if pane_id in self._seen_panes:
+            was_quiet = self.is_low_entropy(last)
+            is_noisy = not self.is_low_entropy(text)
+            if was_quiet and is_noisy:
+                return True
 
         return False
 

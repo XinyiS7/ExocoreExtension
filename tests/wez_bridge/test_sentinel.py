@@ -105,3 +105,23 @@ class TestSentinelPolling:
         sentinel._poll_once()
 
         assert len(triggered) == 0
+
+    def test_poll_does_not_false_alert_on_first_sight(self):
+        """A pane with normal content should not trigger on its first poll."""
+        mock_cli = MagicMock()
+        mock_cli.list_panes.return_value = [
+            {"pane_id": 0, "title": "Alessandro TUI", "is_active": True},
+            {"pane_id": 3, "title": "new pane", "is_active": False},
+        ]
+        mock_cli.get_text.return_value = "user@host:~/project$ ls -la"
+
+        triggered = []
+        sentinel = Sentinel(
+            cli=mock_cli,
+            cache=MagicMock(),
+            host_pane_id="0",
+            on_alert=lambda pid, cp, sn: triggered.append(pid),
+            poll_interval=0.01,
+        )
+        sentinel._poll_once()
+        assert len(triggered) == 0  # First sight — no alert
