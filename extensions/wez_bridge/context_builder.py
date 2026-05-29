@@ -98,7 +98,7 @@ class ContextBuilder:
         )
 
         payload = {
-            "client_type": "windows_extension",
+            "client_type": "wez_bridge",
             "client_display": "WezTerm Bridge",
             "agent": agent_name,
             "source": capture_method,
