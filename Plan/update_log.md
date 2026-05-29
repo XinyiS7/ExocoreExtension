@@ -1,5 +1,72 @@
 # WezTerm Bridge (wez_bridge)
 
+## 哨兵手动开关 + 后台活动标记 + 去熵值误报
+
+**需求：** 哨兵不应自启动，需用户手动 `/sentinel on` 开启（离开屏幕前）。哨兵告警与用户聊天需在 payload 中区分，后端据此处理为后台活动。熵值翻转检测误报率太高（正常终端输出全触发），砍掉只保留错误关键词匹配。
+
+**方案：**
+- `start()` 不再调用 `self._sentinel.start()` —— 哨兵默认关闭，启动时打印提醒
+- 新增 `POST /api/agents/sentinel/toggle/` 端点，接受 `action: "start"|"stop"|"status"`，返回 `sentinel_running` 布尔值
+- sandro_tui.py 新增 `/sentinel [on|off]` 命令，`/status` 集成哨兵状态显示
+- `_on_sentinel_alert` 中传递 `mode="wez_bridge_sentinel"` + `activity_type="sentinel_auto"` 给 `route_to_exocore`，后端可据此识别为后台自动活动（区别于用户聊天的 `mode="wez_bridge"`）
+- `message_router.route_to_exocore` 新增 `mode` 和 `activity_type` 可选参数，透传到 `build_inject_payload`
+- 哨兵告警保持 daemon thread 异步发射，不阻塞轮询循环
+- `sentinel._should_alert` 移除熵值翻转检测逻辑 —— task list、git status、进度条等正常输出不再是误报源，仅错误关键词触发告警
+- `test_extension.py` 更新：哨兵启动断言改为 `assert_not_called`，路由数 5→8
+
+**涉及后端：**
+- 新端点 `POST /api/agents/sentinel/toggle/`（Extension 侧，非后端）
+- `external_context_inject` payload 新增可能字段：
+  - `mode: "wez_bridge_sentinel"` — 哨兵自动告警
+  - `activity_type: "sentinel_auto"` — 后台活动标记
+- 后端收到 `mode == "wez_bridge_sentinel"` 或 `activity_type == "sentinel_auto"` 时应作为后台活动处理，不与用户聊天混入同一对话流
+
+**本地改动摘要：**
+| 文件 | 变更 |
+|------|------|
+| `extensions/wez_bridge/extension.py` | 修改 — 哨兵不自启 + `_on_sentinel_toggle` handler + 告警 payload 带 mode/activity_type |
+| `extensions/wez_bridge/message_router.py` | 修改 — `route_to_exocore` 接受 `mode` / `activity_type` 参数 |
+| `extensions/wez_bridge/sentinel.py` | 修改 — `_should_alert` 移除熵值翻转，仅保留关键词匹配 |
+| `extensions/wez_bridge/local_server.py` | 修改 — +`/api/agents/sentinel/toggle` 路径 |
+| `sandro_tui.py` | 修改 — +`/sentinel` 命令 + `/status` 集成哨兵状态 + `/help` 更新 |
+| `tests/wez_bridge/test_extension.py` | 修改 — 哨兵不自动启动 + 路由数 8 |
+
+**日期 & 署名：** 2026-05-29 · Extension Team (Alessandro)
+
+---
+
+## 上下文缓存释放端点
+
+**需求：** 手动释放 Gemini 上下文缓存。由 compact skill 或手动触发。
+
+**方案：**
+- 新增 `POST /api/agents/cache/release/` 端点，调用后端 `POST /api/agents/cache/invalidate/`
+- 接受可选 `agent_name`，默认使用扩展的默认 agent
+
+**涉及后端：** 已有 `POST /api/agents/cache/invalidate/` 端点
+
+**本地改动摘要：**
+| 文件 | 变更 |
+|------|------|
+| `extensions/wez_bridge/extension.py` | 修改 — +`_on_cache_release` handler |
+| `extensions/wez_bridge/local_server.py` | 修改 — +`/api/agents/cache/release` 路径 |
+
+**日期 & 署名：** 2026-05-29 · Extension Team (Alessandro)
+
+---
+
+## 哨兵告警去重
+
+**需求：** 同一 pane 的相同内容在 30s 内不重复告警。
+
+**方案：** 哨兵维护 `(pane_id, text_hash)` → 上次告警时间的映射，30s 内相同 hash 跳过。
+
+**涉及后端：** 无
+
+**日期 & 署名：** 2026-05-29 · Extension Team (Alessandro)
+
+---
+
 ## CLI Agent TUI 接入 + /chat 端点
 
 **需求：** sandro_tui.py 接上 wez_bridge 本地 daemon，用户在下方面板通过 prompt_toolkit 交互界面直接打字对话，获得 CLI agent 手感。支持 `/agent`、`/resume`、`/sessions`、`/new` 等命令。
