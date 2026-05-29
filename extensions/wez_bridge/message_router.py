@@ -66,6 +66,8 @@ class MessageRouter:
         trigger: str,
         agent_name: str,
         host_pane_id: str = "",
+        mode: str = "wez_bridge",
+        activity_type: str = "",
     ) -> bool:
         """Build full context from a session and inject it into ExoCore.
 
@@ -75,6 +77,10 @@ class MessageRouter:
                      ("sentinel_alert", "user_message", "manual").
             agent_name: Target agent name for ExoCore.
             host_pane_id: Current host pane ID for metadata.
+            mode: Payload mode — "wez_bridge" (user chat) or
+                  "wez_bridge_sentinel" (automated background).
+            activity_type: If set, added to payload so backend can
+                           route as background activity.
 
         Returns:
             True if context was successfully injected.
@@ -94,9 +100,11 @@ class MessageRouter:
                 agent_name=agent_name,
                 capture_method="terminal",
                 target_storage="external_session",
-                mode="wez_bridge",
+                mode=mode,
                 custom_title=f"[{trigger}] {session.summary}",
             )
+            if activity_type:
+                payload["activity_type"] = activity_type
 
             # Auth: body extension_secret preferred; fallback to X-Admin-Key header
             from config import EXOCORE_BASE_URL, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY

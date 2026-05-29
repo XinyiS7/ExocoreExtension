@@ -99,24 +99,17 @@ class Sentinel:
     # ------------------------------------------------------------------
 
     def _should_alert(self, text: str, pane_id: str) -> bool:
-        """Return True if pane content triggers an alert."""
+        """Return True if pane content triggers an alert.
+
+        Only error keyword matches trigger alerts. Entropy-based detection
+        proved too noisy — normal output (task lists, git status, progress
+        bars) triggered false positives constantly.
+        """
         last = self._last_text.get(pane_id, "")
         if text == last:
             return False  # No change, skip
 
-        if self.has_error_keywords(text):
-            return True
-
-        # If previously low-entropy (quiet) and now high-entropy (error dump),
-        # consider it a possible crash report.  Skip on first sight to avoid
-        # false alerts from the initial poll.
-        if pane_id in self._seen_panes:
-            was_quiet = self.is_low_entropy(last)
-            is_noisy = not self.is_low_entropy(text)
-            if was_quiet and is_noisy:
-                return True
-
-        return False
+        return self.has_error_keywords(text)
 
     @staticmethod
     def has_error_keywords(text: str) -> bool:

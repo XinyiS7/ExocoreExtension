@@ -144,31 +144,58 @@ def cmd_help(args: str):
     print("  /resume [index]   — List or pick a recent session")
     print("  /sessions         — List recent sessions")
     print("  /new              — Start a fresh session")
+    print("  /sentinel [on|off] — Toggle background pane monitor")
     print("  /status           — Show current session + agent")
     print("  /clear            — Clear the screen")
     print("  /help             — Show this message")
-    print("  Ctrl+C            — Interrupt")
-    print("  Ctrl+D            — Quit")
+    print("  Ctrl+C            — Quit")
 
 
 def cmd_status(args: str):
     """Show current TUI state."""
+    sentinel = _post("/api/agents/sentinel/toggle/", {"action": "status"})
+    sentinel_status = "ON" if sentinel.get("sentinel_running") else "OFF"
     print(f"  Agent:    {state.agent_name}")
     print(f"  Session:  {state.session_id or '(new)'}")
     print(f"  Summary:  {state.summary or '(none)'}")
     print(f"  Bridge:   {BRIDGE_URL}")
     print(f"  Pane:     {HOST_PANE_ID}")
+    print(f"  Sentinel: {sentinel_status}")
+
+
+def cmd_sentinel(args: str):
+    """Toggle sentinel on/off: /sentinel [on|off]"""
+    action = args.strip().lower()
+    if action not in ("on", "off", ""):
+        print("  Usage: /sentinel [on|off]")
+        print("    on  — Start background pane monitoring")
+        print("    off — Stop background pane monitoring")
+        return
+    if not action:
+        # Default: show status
+        result = _post("/api/agents/sentinel/toggle/", {"action": "status"})
+        status = "ON" if result.get("sentinel_running") else "OFF"
+        print(f"  Sentinel: {status}")
+        return
+
+    result = _post("/api/agents/sentinel/toggle/", {"action": "start" if action == "on" else "stop"})
+    if result.get("status") == "ok":
+        status = "ON" if result.get("sentinel_running") else "OFF"
+        print(f"  Sentinel → {status}  ({result.get('message', '')})")
+    else:
+        print(f"  [ERR] {result.get('message', 'unknown')}")
 
 
 COMMANDS = {
-    "/agent":    cmd_agent,
-    "/resume":   cmd_resume,
-    "/sessions": cmd_sessions,
-    "/new":      cmd_new,
-    "/help":     cmd_help,
-    "/status":   cmd_status,
-    "/clear":    lambda _: os.system("cls" if os.name == "nt" else "clear"),
-    "/pane":     lambda _: print(f"  Host Pane ID: {HOST_PANE_ID}"),
+    "/agent":     cmd_agent,
+    "/resume":    cmd_resume,
+    "/sessions":  cmd_sessions,
+    "/new":       cmd_new,
+    "/sentinel":  cmd_sentinel,
+    "/help":      cmd_help,
+    "/status":    cmd_status,
+    "/clear":     lambda _: os.system("cls" if os.name == "nt" else "clear"),
+    "/pane":      lambda _: print(f"  Host Pane ID: {HOST_PANE_ID}"),
 }
 
 

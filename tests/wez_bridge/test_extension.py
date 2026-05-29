@@ -32,9 +32,10 @@ class TestWezBridgeExtension:
             ext.start()
 
             mock_srv.start.assert_called_once()
-            mock_sentinel_class.return_value.start.assert_called_once()
-            # Should register 5 routes
-            assert mock_srv.register_route.call_count >= 5
+            mock_sentinel_class.return_value.start.assert_not_called()  # Sentinel starts OFF
+            # Should register 8 routes (execute_command, send_message, session_new,
+            # session_resume, sessions_list, agent_select, chat, sentinel_toggle)
+            assert mock_srv.register_route.call_count >= 8
 
     def test_stop_stops_all_components(self):
         with patch("extensions.wez_bridge.extension.WezTermCLI"), \
