@@ -59,3 +59,25 @@ LOCAL_SERVER_PORT = 8777
 DEFAULT_AGENT = "Alessandro"
 AGENT_NAME = DEFAULT_AGENT  # backward compat — prefer DEFAULT_AGENT
 AGENT_ID = "G045"
+
+# ---------------------------------------------------------------------------
+# Session management
+# ---------------------------------------------------------------------------
+SESSION_DIR = os.path.join(EXOCORE_DATA_ROOT, "sessions")
+SESSION_MAX_AGE_SEC = 172800  # 48 hours
+SESSION_SUMMARY_MAX_CHARS = 20  # first user message, truncated
+
+# ---------------------------------------------------------------------------
+# Message routing
+# ---------------------------------------------------------------------------
+# Backend auto-discovers WezTerm windows. We attach our pane_id as metadata
+# so the Superior can target replies to the correct pane.
+HOST_PANE_ID_ENV_VAR = "WEZTERM_PANE"
+
+# ---------------------------------------------------------------------------
+# Context builder
+# ---------------------------------------------------------------------------
+CONTEXT_MAX_MESSAGES = 50  # max messages to include in a context payload
+CONTEXT_TRUNCATE_CHARS = 4000  # max chars per message in context payload
+# Backend auto-summary threshold: >30 messages → compress old → summary
+# + keep last 15. compacted_up_to returned in response.
