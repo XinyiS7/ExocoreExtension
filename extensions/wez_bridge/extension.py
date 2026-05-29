@@ -73,6 +73,8 @@ class WezBridgeExtension(BaseExtension):
         self._server.register_route("sessions_list", self._on_sessions_list)
         self._server.register_route("agent_select", self._on_agent_select)
         self._server.register_route("chat", self._on_chat)
+        self._server.register_route("sentinel_toggle", self._on_sentinel_toggle)
+        self._server.register_route("cache_release", self._on_cache_release)
 
         # 1. Start the local HTTP server
         self._server.start()
@@ -83,12 +85,11 @@ class WezBridgeExtension(BaseExtension):
             self._sentinel._host_pane_id = host_id
             print(f"[{self._name}] Host pane detected: {host_id}")
 
-        # 3. Start the sentinel
-        self._sentinel.start()
-
+        # 3. Sentinel starts OFF — user enables via /sentinel on in TUI
         self._started = True
         print(f"[{self._name}] All components started. "
               f"Server: {self._server.address}")
+        print(f"[{self._name}] Sentinel is OFF. Use /sentinel on to enable.")
 
     def stop(self):
         if not self._started:
@@ -273,6 +274,10 @@ class WezBridgeExtension(BaseExtension):
 
         Returns:
             {reply, session_id, external_session_id, summary}
+
+        external_context_inject already returns the agent reply synchronously
+        in its HTTP response. No second call needed — route_to_exocore stores
+        the reply in session.metadata["last_reply"].
         """
         message = payload.get("message", "")
         session_id = payload.get("session_id", "")
@@ -300,7 +305,9 @@ class WezBridgeExtension(BaseExtension):
             Message(role="user", content=message, metadata={}),
         )
 
-        # Route to ExoCore and get reply
+        # Inject full session context into ExoCore and get the agent reply.
+        # The backend processes synchronously and returns the reply in the
+        # HTTP response — route_to_exocore stores it as last_reply.
         host_id = self._sentinel._host_pane_id or ""
         agent_name = self._resolve_agent_for_session(session)
         ok = self._router.route_to_exocore(
@@ -310,18 +317,20 @@ class WezBridgeExtension(BaseExtension):
             host_pane_id=host_id,
         )
 
-        # Collect reply from what route_to_exocore stored
         reply = session.metadata.get("last_reply", "")
         if not reply and ok:
-            reply = "(sent — waiting for backend reply)"
+            reply = "(sent — awaiting backend reply)"
 
-        return {
+        result = {
             "status": "ok" if ok else "error",
             "reply": reply,
             "session_id": session_id,
             "summary": session.summary,
             "external_session_id": session.metadata.get("external_session_id", ""),
         }
+        if not ok:
+            result["message"] = "Failed to reach ExoCore backend"
+        return result
 
     def _resolve_agent_for_session(self, session=None) -> str:
         """Resolve agent name for a session.
@@ -337,19 +346,89 @@ class WezBridgeExtension(BaseExtension):
         return self.get_assigned_agent_name()
 
     # ------------------------------------------------------------------
+    # Sentinel control
+    # ------------------------------------------------------------------
+
+    def _on_sentinel_toggle(self, payload: dict) -> dict:
+        """POST /api/agents/sentinel/toggle/ — Start/stop/status of the sentinel.
+
+        Payload:
+            action (str): "start" | "stop" | "status"
+
+        The sentinel is OFF by default. User enables it via /sentinel on
+        when leaving the screen. Alerts are marked as background activity
+        so the backend handles them without treating them as user chat.
+        """
+        action = payload.get("action", "status")
+
+        if action == "start":
+            if not self._sentinel._running:
+                self._sentinel.start()
+                print(f"[{self._name}] Sentinel started by user")
+                return {"status": "ok", "sentinel_running": True,
+                        "message": "Sentinel started — monitoring panes"}
+            return {"status": "ok", "sentinel_running": True,
+                    "message": "Sentinel already running"}
+
+        elif action == "stop":
+            if self._sentinel._running:
+                self._sentinel.stop()
+                print(f"[{self._name}] Sentinel stopped by user")
+                return {"status": "ok", "sentinel_running": False,
+                        "message": "Sentinel stopped"}
+            return {"status": "ok", "sentinel_running": False,
+                    "message": "Sentinel already stopped"}
+
+        else:  # status
+            return {"status": "ok",
+                    "sentinel_running": self._sentinel._running}
+
+    def _on_cache_release(self, payload: dict) -> dict:
+        """POST /api/agents/cache/release/ — 手动释放 Gemini 上下文缓存。
+
+        调用 ExoCore 后端 POST /api/agents/cache/invalidate/ 释放当前 agent
+        的 wez_bridge 缓存。通常由 compact skill 触发。
+        """
+        from config import EXOCORE_BASE_URL, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
+        from core.agent_registry import agent_registry as reg
+        import requests as _requests
+
+        agent_name = payload.get("agent_name") or self.get_assigned_agent_name()
+
+        url = f"{EXOCORE_BASE_URL.rstrip('/')}/api/agents/cache/invalidate/"
+        body = {"agent": agent_name}
+        headers = {}
+        if EXOCORE_EXTENSION_KEY:
+            body["extension_secret"] = EXOCORE_EXTENSION_KEY
+        elif EXOCORE_ADMIN_KEY:
+            headers["X-Admin-Key"] = EXOCORE_ADMIN_KEY
+
+        try:
+            resp = _requests.post(url, json=body, headers=headers, timeout=10)
+            resp.raise_for_status()
+            result = resp.json()
+            print(f"[{self._name}] Cache released for '{agent_name}': {result.get('message', '')}")
+            return {"status": "ok", **result}
+        except Exception as e:
+            print(f"[{self._name}] Cache release failed: {e}")
+            return {"status": "error", "message": str(e)}
+
+    # ------------------------------------------------------------------
     # Sentinel → ExoCore (Channel 1)
     # ------------------------------------------------------------------
 
     def _on_sentinel_alert(self, pane_id: str, cache_path: str, snippet: str):
         """Called when the Sentinel detects an error in a monitored pane.
 
-        Creates a session, logs the alert, and routes full context to ExoCore
-        through the MessageRouter.
+        Creates a session, logs the alert, and fires context to ExoCore
+        asynchronously with mode="wez_bridge_sentinel" so the backend
+        recognises it as automated background activity, not user chat.
         """
         # Create a session for this alert
         session = self._sessions.create_session(
             first_user_message=f"[Sentinel Alert] Pane {pane_id}",
-            metadata={"pane_id": pane_id, "cache_path": cache_path},
+            metadata={"pane_id": pane_id, "cache_path": cache_path,
+                      "activity_type": "sentinel_auto"},
         )
         self._sessions.add_message(
             session.session_id,
@@ -360,17 +439,25 @@ class WezBridgeExtension(BaseExtension):
             ),
         )
 
-        # Route full context to ExoCore
+        # Fire-and-forget: inject context in a daemon thread so the
+        # sentinel loop stays responsive. mode + activity_type tell
+        # the backend this is automated background activity.
         host_id = self._sentinel._host_pane_id or ""
         agent_name = self._resolve_agent_for_session(session)
-        ok = self._router.route_to_exocore(
-            session=session,
-            trigger="sentinel_alert",
-            agent_name=agent_name,
-            host_pane_id=host_id,
-        )
-        # Backend returns external_session_id in context_inject response.
-        # Stored by MessageRouter in session metadata for correlation.
+        import threading
+        threading.Thread(
+            target=self._router.route_to_exocore,
+            args=(session,),
+            kwargs={
+                "trigger": "sentinel_alert",
+                "agent_name": agent_name,
+                "host_pane_id": host_id,
+                "mode": "wez_bridge_sentinel",
+                "activity_type": "sentinel_auto",
+            },
+            daemon=True,
+            name=f"sentinel-alert-pane{pane_id}",
+        ).start()
 
     # ------------------------------------------------------------------
     # Tray menu

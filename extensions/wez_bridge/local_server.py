@@ -53,6 +53,10 @@ class _Handler(BaseHTTPRequestHandler):
             route_key = "agent_select"
         elif path == "/api/agents/chat":
             route_key = "chat"
+        elif path == "/api/agents/sentinel/toggle":
+            route_key = "sentinel_toggle"
+        elif path == "/api/agents/cache/release":
+            route_key = "cache_release"
         else:
             self.send_error(404, "Not Found")
             return
