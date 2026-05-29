@@ -108,6 +108,8 @@ class MessageRouter:
                 session.metadata["compacted_up_to"] = response["compacted_up_to"]
             if response.get("cache_reference"):
                 self._context_builder.sync_cache(response["cache_reference"])
+            if response.get("reply"):
+                session.metadata["last_reply"] = response["reply"]
 
             return True
         except Exception as e:

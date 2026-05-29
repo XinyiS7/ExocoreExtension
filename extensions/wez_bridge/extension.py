@@ -72,6 +72,7 @@ class WezBridgeExtension(BaseExtension):
         self._server.register_route("session_resume", self._on_session_resume)
         self._server.register_route("sessions_list", self._on_sessions_list)
         self._server.register_route("agent_select", self._on_agent_select)
+        self._server.register_route("chat", self._on_chat)
 
         # 1. Start the local HTTP server
         self._server.start()
@@ -262,14 +263,75 @@ class WezBridgeExtension(BaseExtension):
             "agent_id": resolved_id,
         }
 
-    def _resolve_agent_for_session(self, session) -> str:
+    def _on_chat(self, payload: dict) -> dict:
+        """POST /api/agents/chat/ — Send a user message, get an agent reply.
+
+        Payload:
+            message    (str): User's message text.
+            session_id (str, optional): Existing session to continue.
+                                        If omitted, a new session is created.
+
+        Returns:
+            {reply, session_id, external_session_id, summary}
+        """
+        message = payload.get("message", "")
+        session_id = payload.get("session_id", "")
+        if not message.strip():
+            return {"status": "error", "message": "message is required"}
+
+        # Get or create session
+        if session_id:
+            session = self._sessions.get_session(session_id)
+            if session is None:
+                return {"status": "error", "message": f"Session not found: {session_id}"}
+        else:
+            session = self._sessions.create_session(
+                first_user_message=message,
+                metadata={
+                    "pane_id": self._sentinel._host_pane_id or "",
+                    "agent_name": self._resolve_agent_for_session(None),
+                },
+            )
+            session_id = session.session_id
+
+        # Add user message
+        self._sessions.add_message(
+            session_id,
+            Message(role="user", content=message, metadata={}),
+        )
+
+        # Route to ExoCore and get reply
+        host_id = self._sentinel._host_pane_id or ""
+        agent_name = self._resolve_agent_for_session(session)
+        ok = self._router.route_to_exocore(
+            session=session,
+            trigger="user_message",
+            agent_name=agent_name,
+            host_pane_id=host_id,
+        )
+
+        # Collect reply from what route_to_exocore stored
+        reply = session.metadata.get("last_reply", "")
+        if not reply and ok:
+            reply = "(sent — waiting for backend reply)"
+
+        return {
+            "status": "ok" if ok else "error",
+            "reply": reply,
+            "session_id": session_id,
+            "summary": session.summary,
+            "external_session_id": session.metadata.get("external_session_id", ""),
+        }
+
+    def _resolve_agent_for_session(self, session=None) -> str:
         """Resolve agent name for a session.
 
         Priority: session override > instance override > registry/config default.
         """
-        session_agent = (session.metadata or {}).get("agent_name")
-        if session_agent:
-            return session_agent
+        if session is not None:
+            session_agent = (session.metadata or {}).get("agent_name")
+            if session_agent:
+                return session_agent
         if self._instance_agent_override:
             return self._instance_agent_override
         return self.get_assigned_agent_name()
