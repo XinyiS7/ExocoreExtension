@@ -51,6 +51,10 @@ class WezBridgeExtension(BaseExtension):
         self._instance_agent_override: str | None = None  # set by /agent w/o session_id
         self._started = False
 
+        # 哨兵去重：pane_id → (text_hash, timestamp)
+        self._last_alert_hash: dict[str, tuple[str, float]] = {}
+        self._ALERT_DEDUP_SEC = 30.0
+
     # ------------------------------------------------------------------
     # BaseExtension protocol
     # ------------------------------------------------------------------
@@ -420,10 +424,24 @@ class WezBridgeExtension(BaseExtension):
     def _on_sentinel_alert(self, pane_id: str, cache_path: str, snippet: str):
         """Called when the Sentinel detects an error in a monitored pane.
 
-        Creates a session, logs the alert, and fires context to ExoCore
-        asynchronously with mode="wez_bridge_sentinel" so the backend
-        recognises it as automated background activity, not user chat.
+        Dedup + fire-and-forget to ExoCore with mode="wez_bridge_sentinel".
+        Same pane + same text hash within 30s → skip.
         """
+        import hashlib
+        import time
+
+        # --- 去重：相同 pane + 相同文本哈希 30s 内不重复发送 ---
+        text_hash = hashlib.sha256(snippet.encode()).hexdigest()
+        now = time.time()
+        prev = self._last_alert_hash.get(pane_id)
+        if prev is not None:
+            prev_hash, prev_ts = prev
+            if prev_hash == text_hash and (now - prev_ts) < self._ALERT_DEDUP_SEC:
+                print(f"[{self._name}] Sentinel dedup: pane {pane_id} same alert within "
+                      f"{now - prev_ts:.1f}s, skipping")
+                return
+        self._last_alert_hash[pane_id] = (text_hash, now)
+
         # Create a session for this alert
         session = self._sessions.create_session(
             first_user_message=f"[Sentinel Alert] Pane {pane_id}",
