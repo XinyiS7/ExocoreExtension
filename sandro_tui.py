@@ -190,8 +190,9 @@ bindings = KeyBindings()
 
 @bindings.add("c-c")
 def _(event):
-    """Ctrl+C: clear current input line."""
-    print("\n[Interrupted]")
+    """Ctrl+C: quit the TUI."""
+    print("\n[Exiting]")
+    event.app.exit()
 
 
 def main():
@@ -228,7 +229,8 @@ def main():
                 multiline=False,
             )
         except KeyboardInterrupt:
-            continue
+            print("\n[Exiting]")
+            break
         except EOFError:
             print("\n[Exiting]")
             break
