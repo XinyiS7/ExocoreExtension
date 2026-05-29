@@ -7,12 +7,10 @@ class TestMessageRouter:
         self.mock_cli = MagicMock()
         self.mock_session_manager = MagicMock()
         self.mock_context_builder = MagicMock()
-        self.mock_client_factory = MagicMock()
         self.router = MessageRouter(
             cli=self.mock_cli,
             session_manager=self.mock_session_manager,
             context_builder=self.mock_context_builder,
-            client_factory=self.mock_client_factory,
         )
 
     # --- Route to pane ---
@@ -26,7 +24,6 @@ class TestMessageRouter:
         )
         assert result is True
         self.mock_cli.send_text.assert_called_once()
-        # send_text(pane_id, text) — second positional arg is the message text
         call_arg = self.mock_cli.send_text.call_args[0][1]
         assert "hello from superior" in call_arg
         assert "G045" in call_arg
@@ -42,7 +39,16 @@ class TestMessageRouter:
 
     # --- Route to ExoCore ---
 
-    def test_route_to_exocore_builds_context_and_injects(self):
+    @patch("extensions.wez_bridge.message_router.requests.post")
+    def test_route_to_exocore_builds_context_and_posts(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "success": True,
+            "reply": "ok",
+            "external_session_id": "ext_001",
+        }
+        mock_post.return_value = mock_resp
+
         mock_session = MagicMock()
         mock_session.session_id = "sess_test"
         mock_session.summary = "test summary"
@@ -61,14 +67,6 @@ class TestMessageRouter:
             "mode": "wez_bridge",
         }
 
-        mock_client = MagicMock()
-        mock_client.inject_context.return_value = {
-            "success": True,
-            "reply": "ok",
-            "external_session_id": "ext_001",
-        }
-        self.mock_client_factory.return_value = mock_client
-
         result = self.router.route_to_exocore(
             session=mock_session,
             trigger="sentinel_alert",
@@ -77,9 +75,12 @@ class TestMessageRouter:
         )
         assert result is True
         self.mock_context_builder.build_full_context.assert_called_once()
-        mock_client.inject_context.assert_called_once()
+        mock_post.assert_called_once()
 
-    def test_route_to_exocore_handles_inject_failure(self):
+    @patch("extensions.wez_bridge.message_router.requests.post")
+    def test_route_to_exocore_handles_post_failure(self, mock_post):
+        mock_post.side_effect = Exception("Connection refused")
+
         mock_session = MagicMock()
         mock_session.session_id = "sess_test"
         self.mock_context_builder.build_full_context.return_value = {
@@ -89,10 +90,6 @@ class TestMessageRouter:
         }
         self.mock_context_builder.build_inject_payload.return_value = {}
 
-        mock_client = MagicMock()
-        mock_client.inject_context.side_effect = Exception("Connection refused")
-        self.mock_client_factory.return_value = mock_client
-
         result = self.router.route_to_exocore(
             session=mock_session,
             trigger="sentinel_alert",
@@ -101,7 +98,18 @@ class TestMessageRouter:
         )
         assert result is False
 
-    def test_route_to_exocore_stores_external_session_id(self):
+    @patch("extensions.wez_bridge.message_router.requests.post")
+    def test_route_to_exocore_stores_external_session_id(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "success": True,
+            "reply": "ok",
+            "external_session_id": "ext_xyz789",
+            "compacted_up_to": 10,
+            "cache_reference": "gemini_file_abc",
+        }
+        mock_post.return_value = mock_resp
+
         mock_session = MagicMock()
         mock_session.session_id = "sess_test"
         mock_session.summary = "test"
@@ -113,16 +121,6 @@ class TestMessageRouter:
             "metadata": {},
         }
         self.mock_context_builder.build_inject_payload.return_value = {}
-
-        mock_client = MagicMock()
-        mock_client.inject_context.return_value = {
-            "success": True,
-            "reply": "ok",
-            "external_session_id": "ext_xyz789",
-            "compacted_up_to": 10,
-            "cache_reference": "gemini_file_abc",
-        }
-        self.mock_client_factory.return_value = mock_client
 
         self.router.route_to_exocore(
             session=mock_session,

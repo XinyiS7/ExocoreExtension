@@ -37,7 +37,25 @@
       "Bash(Get-ChildItem -Recurse -Depth 2 D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension)",
       "Bash(Select-Object FullName)",
       "Bash(Select-String -Pattern \"spec\")",
-      "Bash(Select-Object -First 30)"
+      "Bash(Select-Object -First 30)",
+      "Bash(Get-ChildItem D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension -Filter \"*.toml\" -Name)",
+      "Bash(Get-ChildItem D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension -Filter \"*.cfg\" -Name)",
+      "Bash(Get-ChildItem D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension -Filter \"*.ini\" -Name)",
+      "PowerShell(python -c \"import ast; ast.parse\\(open\\('sandro_tui.py'\\).read\\(\\)\\); print\\('Syntax OK'\\)\")",
+      "PowerShell(python -m pytest tests/ -v --tb=short 2>&1 | Select-Object -Last 30)",
+      "PowerShell(Get-Content -Path \"D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension\\\\docs\\\\superpowers\\\\plans\\\\2026-05-26-unified-extension-agent-management.md\" -TotalCount 10 -Encoding utf8 | ForEach-Object { [PSCustomObject]@{Line = $_} } | Format-Table -AutoSize)",
+      "Bash(PYTHONPATH=\"D:/Alicia/ExoCore_Project/ExocoreExtension\" python -m pytest tests/core/test_agent_registry_assignments.py -v)",
+      "PowerShell(cd D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension; $env:PYTHONPATH = \"D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension\"; python -m pytest tests/core/test_agent_registry_assignments.py -v)",
+      "PowerShell($env:PYTHONPATH = \"D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension\"; python -c \"import os; print\\(os.environ.get\\('PYTHONPATH', 'NOT SET'\\)\\)\")",
+      "PowerShell($env:PYTHONPATH = \"D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension\"; python -c \"import sys; sys.path.insert\\(0, 'D:/Alicia/ExoCore_Project/ExocoreExtension'\\); import pytest; pytest.main\\(['-v', 'tests/core/test_agent_registry_assignments.py']\\)\")",
+      "PowerShell(python -c \"import sys; sys.path.insert\\(0, 'D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension'\\); import pytest; exit\\(pytest.main\\(['-v', 'tests/core/test_agent_registry_assignments.py', '--rootdir=D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension']\\)\\)\")",
+      "PowerShell(python -m pytest tests/core/test_agent_registry_assignments.py -v 2>&1)",
+      "PowerShell(python -c \"import sys; print\\(sys.path\\)\" 2>&1)",
+      "PowerShell(python -c \"import sys; sys.path.insert\\(0, 'D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension'\\); from core.agent_registry import AgentRegistry; r = AgentRegistry\\('D:\\\\Alicia\\\\ExoCore_Project\\\\ExocoreExtension'\\); print\\(r.get_all\\(\\)\\)\")",
+      "PowerShell(python -m pytest tests/core/test_base_extension_agent.py -v)",
+      "PowerShell(python -m pytest tests/ -v)",
+      "PowerShell(git commit *)",
+      "PowerShell(python -m pytest tests/ -q 2>&1 | Select-Object -Last 5)"
     ]
   }
 }

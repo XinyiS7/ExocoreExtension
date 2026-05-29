@@ -13,6 +13,8 @@ Response fields from ExoCore (wez_bridge mode):
     - compacted_up_to: Message index cursor after compact (>30 msgs).
     - cache_reference: Gemini File API reference (if backend sends).
 """
+import json
+import requests
 from typing import Callable, Optional
 from .wezterm_cli import WezTermCLI
 from .session_manager import SessionManager, Session, Message
@@ -27,12 +29,10 @@ class MessageRouter:
         cli: Optional[WezTermCLI] = None,
         session_manager: Optional[SessionManager] = None,
         context_builder: Optional[ContextBuilder] = None,
-        client_factory: Optional[Callable] = None,
     ):
         self._cli = cli or WezTermCLI()
         self._sessions = session_manager or SessionManager()
         self._context_builder = context_builder or ContextBuilder()
-        self._client_factory = client_factory or self._default_client
 
     # ------------------------------------------------------------------
     # Channel 2: Direct messages → target pane
@@ -98,8 +98,18 @@ class MessageRouter:
                 custom_title=f"[{trigger}] {session.summary}",
             )
 
-            client = self._client_factory(agent_name)
-            response = client.inject_context(**payload)
+            # Auth: body extension_secret preferred; fallback to X-Admin-Key header
+            from config import EXOCORE_BASE_URL, EXOCORE_EXTENSION_KEY, EXOCORE_ADMIN_KEY
+            url = f"{EXOCORE_BASE_URL.rstrip('/')}/api/agents/external_context_inject/"
+            headers = {}
+            if EXOCORE_EXTENSION_KEY:
+                payload["extension_secret"] = EXOCORE_EXTENSION_KEY
+            elif EXOCORE_ADMIN_KEY:
+                headers["X-Admin-Key"] = EXOCORE_ADMIN_KEY
+
+            resp = requests.post(url, json=payload, headers=headers, timeout=120)
+            resp.raise_for_status()
+            response = resp.json()
 
             # Store correlation IDs from backend response
             if response.get("external_session_id"):
@@ -136,8 +146,3 @@ class MessageRouter:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
-
-    @staticmethod
-    def _default_client(agent_name: str):
-        from core.api_client import ExocoreClient
-        return ExocoreClient(agent_name=agent_name)

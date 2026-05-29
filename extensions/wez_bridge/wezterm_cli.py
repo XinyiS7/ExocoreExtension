@@ -77,5 +77,8 @@ class WezTermCLI:
             return False
 
     def send_enter(self, pane_id: int | str) -> bool:
-        """Send a newline (Enter key) to a pane."""
-        return self.send_text(pane_id, "\n")
+        """Send a carriage return to submit the command.
+        On Windows / Git Bash, standard LF (\\n) often fails to submit the buffer.
+        Carriage Return (\\r) ensures the shell executes the command raw.
+        """
+        return self.send_text(pane_id, "\r")
