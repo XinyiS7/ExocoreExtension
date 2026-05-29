@@ -195,12 +195,13 @@ def _(event):
 
 
 def main():
+    global BRIDGE_URL
+
     parser = argparse.ArgumentParser(description="Alessandro Terminal Pane")
     parser.add_argument("--bridge", default=BRIDGE_URL,
                         help="wez_bridge URL (default: http://127.0.0.1:8777)")
     args_cli = parser.parse_args()
 
-    global BRIDGE_URL
     BRIDGE_URL = args_cli.bridge
 
     # Try to get current agent from bridge
