@@ -82,7 +82,8 @@ class AgentRegistry:
     # Public write API
     # ------------------------------------------------------------------
 
-    def add_agent(self, name: str, mode: str = "zero_tool", model: str = "") -> None:
+    def add_agent(self, name: str, mode: str = "zero_tool", model: str = "",
+                  agent_id: str | None = None) -> None:
         with self._lock:
             names = {cfg["name"] for cfg in self._configs}
             if name in names:
@@ -90,8 +91,29 @@ class AgentRegistry:
             entry: dict = {"name": name, "mode": mode}
             if model:
                 entry["model"] = model
+            if agent_id:
+                entry["agent_id"] = agent_id
             self._configs.append(entry)
             self._persist()
+
+    def get_by_agent_id(self, agent_id: str) -> dict | None:
+        """Look up an agent by its agent_id field. Returns config dict or None."""
+        with self._lock:
+            for cfg in self._configs:
+                if cfg.get("agent_id") == agent_id:
+                    return dict(cfg)
+            return None
+
+    def resolve_agent(self, name_or_id: str) -> dict | None:
+        """Resolve an agent by name or ID. Tries agent_id first, then name."""
+        with self._lock:
+            for cfg in self._configs:
+                if cfg.get("agent_id") == name_or_id:
+                    return dict(cfg)
+            for cfg in self._configs:
+                if cfg["name"] == name_or_id:
+                    return dict(cfg)
+            return None
 
     def set_default_agent(self, name: str) -> None:
         with self._lock:

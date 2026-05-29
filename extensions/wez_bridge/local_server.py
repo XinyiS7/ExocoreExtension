@@ -49,6 +49,8 @@ class _Handler(BaseHTTPRequestHandler):
             route_key = "session_new"
         elif path == "/api/agents/session/resume":
             route_key = "session_resume"
+        elif path == "/api/agents/agent/select":
+            route_key = "agent_select"
         else:
             self.send_error(404, "Not Found")
             return

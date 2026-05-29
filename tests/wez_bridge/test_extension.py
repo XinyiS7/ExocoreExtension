@@ -85,7 +85,7 @@ class TestWezBridgeExtension:
             assert result["session_id"] == "sess_new_001"
             mock_sm.create_session.assert_called_once_with(
                 first_user_message="帮我看看这个报错",
-                metadata={"pane_id": "2"},
+                metadata={"pane_id": "2", "agent_name": "Alessandro"},
             )
 
     def test_send_message_route_routes_to_pane_and_displays(self):

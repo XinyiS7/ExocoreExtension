@@ -5,7 +5,6 @@ Orchestrates the Sentinel, Commander, SessionManager, MessageRouter,
 ContextBuilder, and Local HTTP Server. Provides dual-channel communication
 between WezTerm panes and ExoCore.
 """
-from pystray import MenuItem
 from core.base_extension import BaseExtension
 from .wezterm_cli import WezTermCLI
 from .cache_manager import CacheManager
@@ -49,6 +48,7 @@ class WezBridgeExtension(BaseExtension):
         # Local HTTP server — receives commands, messages, and session ops
         self._server = LocalCommandServer()
 
+        self._instance_agent_override: str | None = None  # set by /agent w/o session_id
         self._started = False
 
     # ------------------------------------------------------------------
@@ -71,6 +71,7 @@ class WezBridgeExtension(BaseExtension):
         self._server.register_route("session_new", self._on_session_new)
         self._server.register_route("session_resume", self._on_session_resume)
         self._server.register_route("sessions_list", self._on_sessions_list)
+        self._server.register_route("agent_select", self._on_agent_select)
 
         # 1. Start the local HTTP server
         self._server.start()
@@ -98,7 +99,8 @@ class WezBridgeExtension(BaseExtension):
         self._server.stop()
         print(f"[{self._name}] Stopped.")
 
-    def get_menu_items(self) -> list[MenuItem]:
+    def get_menu_items(self) -> list:
+        from pystray import MenuItem  # lazy — only tray mode triggers this
         return [
             MenuItem("WezTerm Bridge Status", self._menu_status),
         ]
@@ -162,6 +164,12 @@ class WezBridgeExtension(BaseExtension):
         if not first_message.strip():
             return {"status": "error", "message": "first_user_message is required"}
 
+        # Stamp the effective agent on session creation
+        if "agent_name" not in metadata:
+            metadata["agent_name"] = (
+                self._instance_agent_override or self.get_assigned_agent_name()
+            )
+
         session = self._sessions.create_session(
             first_user_message=first_message,
             metadata=metadata,
@@ -205,6 +213,67 @@ class WezBridgeExtension(BaseExtension):
             ],
         }
 
+    def _on_agent_select(self, payload: dict) -> dict:
+        """POST /api/agents/agent/select/ — Switch agent by name or ID.
+
+        Payload:
+            agent_name (str, optional): Agent name (e.g. "Alessandro").
+            agent_id   (str, optional): Agent ID (e.g. "G045").
+            session_id (str, optional): If set, override agent for that session
+                                        only. Otherwise set instance default.
+        """
+        from core.agent_registry import agent_registry
+
+        agent_name = payload.get("agent_name", "")
+        agent_id = payload.get("agent_id", "")
+        session_id = payload.get("session_id", "")
+
+        if not agent_name and not agent_id:
+            return {"status": "error", "message": "Provide agent_name or agent_id"}
+
+        # Resolve: try name first, then ID fallback
+        resolved = None
+        if agent_name:
+            resolved = agent_registry.get_agent_config(agent_name)
+        if not resolved and agent_id:
+            resolved = agent_registry.get_by_agent_id(agent_id)
+
+        if not resolved:
+            return {
+                "status": "error",
+                "message": f"Agent not found: name='{agent_name}' id='{agent_id}'",
+            }
+
+        resolved_name = resolved["name"]
+        resolved_id = resolved.get("agent_id", "")
+
+        if session_id:
+            session = self._sessions.get_session(session_id)
+            if session is None:
+                return {"status": "error", "message": f"Session not found: {session_id}"}
+            session.metadata["agent_name"] = resolved_name
+            self._sessions._save_session(session)
+        else:
+            self._instance_agent_override = resolved_name
+
+        return {
+            "status": "ok",
+            "agent_name": resolved_name,
+            "agent_id": resolved_id,
+        }
+
+    def _resolve_agent_for_session(self, session) -> str:
+        """Resolve agent name for a session.
+
+        Priority: session override > instance override > registry/config default.
+        """
+        session_agent = (session.metadata or {}).get("agent_name")
+        if session_agent:
+            return session_agent
+        if self._instance_agent_override:
+            return self._instance_agent_override
+        return self.get_assigned_agent_name()
+
     # ------------------------------------------------------------------
     # Sentinel → ExoCore (Channel 1)
     # ------------------------------------------------------------------
@@ -231,7 +300,7 @@ class WezBridgeExtension(BaseExtension):
 
         # Route full context to ExoCore
         host_id = self._sentinel._host_pane_id or ""
-        agent_name = self.get_assigned_agent_name()
+        agent_name = self._resolve_agent_for_session(session)
         ok = self._router.route_to_exocore(
             session=session,
             trigger="sentinel_alert",
