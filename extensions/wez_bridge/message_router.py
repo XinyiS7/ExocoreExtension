@@ -128,6 +128,13 @@ class MessageRouter:
                 self._context_builder.sync_cache(response["cache_reference"])
             if response.get("reply"):
                 session.metadata["last_reply"] = response["reply"]
+            # Compaction sync — backend may return compact_chunks aligned with Proposal model
+            if response.get("compact_chunks"):
+                session.metadata["compact_chunks"] = response["compact_chunks"]
+            if response.get("cache_rebuilt"):
+                session.metadata["cache_rebuilt"] = response["cache_rebuilt"]
+            if response.get("sentinel_rounds_completed") is not None:
+                session.metadata["sentinel_rounds_completed"] = response["sentinel_rounds_completed"]
 
             return True
         except Exception as e:

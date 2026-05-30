@@ -67,7 +67,7 @@ class ContextBuilder:
         if self._cache_reference:
             metadata["cache_reference"] = self._cache_reference
 
-        return {
+        result = {
             "session_id": session.session_id,
             "summary": session.summary,
             "messages": serialized_messages,
@@ -75,6 +75,13 @@ class ContextBuilder:
             "last_active": session.last_active,
             "metadata": metadata,
         }
+        # Include pending sentinel if present (temp field, not in messages)
+        if session.pending_sentinel:
+            result["pending_sentinel"] = session.pending_sentinel
+        # Include compact chunks for backend sync
+        if session.compact_chunks:
+            result["compact_chunks"] = session.compact_chunks
+        return result
 
     def build_inject_payload(
         self,
@@ -114,6 +121,14 @@ class ContextBuilder:
         ext_sid = context.get("metadata", {}).get("external_session_id")
         if ext_sid:
             payload["external_session_id"] = ext_sid
+        # Pass pending sentinel as dedicated field (backend ignores unknown fields)
+        pending = context.get("pending_sentinel")
+        if pending:
+            payload["pending_sentinel"] = pending
+        # Pass compact chunks for backend sync
+        chunks = context.get("compact_chunks")
+        if chunks:
+            payload["compact_chunks"] = chunks
         return payload
 
     def sync_cache(self, cache_reference: str) -> None:

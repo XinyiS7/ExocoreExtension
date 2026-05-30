@@ -8,13 +8,14 @@ between WezTerm panes and ExoCore.
 from core.base_extension import BaseExtension
 from .wezterm_cli import WezTermCLI
 from .cache_manager import CacheManager
-from .session_manager import SessionManager, Message
+from .session_manager import SessionManager, Session, Message
 from .context_builder import ContextBuilder
 from .message_router import MessageRouter
 from .sentinel import Sentinel
 from .commander import Commander
 from .local_server import LocalCommandServer
 from .config import DEFAULT_AGENT
+import time
 
 
 class WezBridgeExtension(BaseExtension):
@@ -50,6 +51,9 @@ class WezBridgeExtension(BaseExtension):
 
         self._instance_agent_override: str | None = None  # set by /agent w/o session_id
         self._started = False
+
+        # Active chat session — sentinel alerts reuse this session for cache continuity
+        self._active_chat_session_id: str | None = None
 
         # 哨兵去重：pane_id → (text_hash, timestamp)
         self._last_alert_hash: dict[str, tuple[str, float]] = {}
@@ -293,6 +297,7 @@ class WezBridgeExtension(BaseExtension):
             session = self._sessions.get_session(session_id)
             if session is None:
                 return {"status": "error", "message": f"Session not found: {session_id}"}
+            self._active_chat_session_id = session_id
         else:
             session = self._sessions.create_session(
                 first_user_message=message,
@@ -302,6 +307,7 @@ class WezBridgeExtension(BaseExtension):
                 },
             )
             session_id = session.session_id
+            self._active_chat_session_id = session_id
 
         # Add user message
         self._sessions.add_message(
@@ -421,14 +427,40 @@ class WezBridgeExtension(BaseExtension):
     # Sentinel → ExoCore (Channel 1)
     # ------------------------------------------------------------------
 
+    def _get_or_create_chat_session(self) -> Session:
+        """Return the active chat session, creating one if none exists.
+
+        Sentinel alerts reuse this session so the backend's per-preset
+        cache (cli_conv) stays warm across sentinel rounds.
+        """
+        if self._active_chat_session_id:
+            session = self._sessions.get_session(self._active_chat_session_id)
+            if session is not None:
+                return session
+        # No active session — create a fresh one (will be adopted by _on_chat)
+        host_id = self._sentinel._host_pane_id or ""
+        agent_name = self._resolve_agent_for_session(None)
+        session = self._sessions.create_session(
+            first_user_message="[WezTerm Bridge Session]",
+            metadata={
+                "pane_id": host_id,
+                "agent_name": agent_name,
+            },
+        )
+        self._active_chat_session_id = session.session_id
+        print(f"[{self._name}] Created fallback chat session {session.session_id} "
+              f"for sentinel")
+        return session
+
     def _on_sentinel_alert(self, pane_id: str, cache_path: str, snippet: str):
         """Called when the Sentinel detects an error in a monitored pane.
 
-        Dedup + fire-and-forget to ExoCore with mode="wez_bridge_sentinel".
-        Same pane + same text hash within 30s → skip.
+        Reuses the active chat session instead of creating a new one.
+        Sentinel content goes into ``pending_sentinel`` (temp field), NOT
+        the permanent message list. After the backend responds, two messages
+        are generated: user summary + assistant reply.
         """
         import hashlib
-        import time
 
         # --- 去重：相同 pane + 相同文本哈希 30s 内不重复发送 ---
         text_hash = hashlib.sha256(snippet.encode()).hexdigest()
@@ -442,40 +474,147 @@ class WezBridgeExtension(BaseExtension):
                 return
         self._last_alert_hash[pane_id] = (text_hash, now)
 
-        # Create a session for this alert
-        session = self._sessions.create_session(
-            first_user_message=f"[Sentinel Alert] Pane {pane_id}",
-            metadata={"pane_id": pane_id, "cache_path": cache_path,
-                      "activity_type": "sentinel_auto"},
-        )
-        self._sessions.add_message(
-            session.session_id,
-            Message(
-                role="sentinel",
-                content=snippet,
-                metadata={"pane_id": pane_id, "cache_path": cache_path},
-            ),
-        )
+        # Reuse the active chat session — do NOT create a new one
+        session = self._get_or_create_chat_session()
 
-        # Fire-and-forget: inject context in a daemon thread so the
-        # sentinel loop stays responsive. mode + activity_type tell
-        # the backend this is automated background activity.
+        # Store sentinel content in temp field, NOT in messages
+        session.pending_sentinel = {
+            "pane_id": pane_id,
+            "snippet": snippet,
+            "cache_path": cache_path,
+            "sent_at": now,
+        }
+        self._sessions._save_session(session)
+
         host_id = self._sentinel._host_pane_id or ""
         agent_name = self._resolve_agent_for_session(session)
+
+        # Fire-and-forget in daemon thread so the sentinel loop stays responsive
         import threading
         threading.Thread(
-            target=self._router.route_to_exocore,
-            args=(session,),
-            kwargs={
-                "trigger": "sentinel_alert",
-                "agent_name": agent_name,
-                "host_pane_id": host_id,
-                "mode": "wez_bridge_sentinel",
-                "activity_type": "sentinel_auto",
-            },
+            target=self._process_sentinel,
+            args=(session.session_id, pane_id, snippet, agent_name, host_id),
             daemon=True,
             name=f"sentinel-alert-pane{pane_id}",
         ).start()
+
+    def _process_sentinel(
+        self, session_id: str, pane_id: str, snippet: str,
+        agent_name: str, host_id: str,
+    ):
+        """Send sentinel alert to backend and resolve the response.
+
+        Runs in a daemon thread. On success, generates two permanent
+        messages (user summary + assistant reply) and handles compaction.
+        """
+        session = self._sessions.get_session(session_id)
+        if session is None:
+            print(f"[{self._name}] Sentinel session {session_id} expired, skipping")
+            return
+        if not session.pending_sentinel:
+            print(f"[{self._name}] Sentinel pending_sentinel cleared for {session_id}, skipping")
+            return
+
+        ok = self._router.route_to_exocore(
+            session=session,
+            trigger="sentinel_alert",
+            agent_name=agent_name,
+            host_pane_id=host_id,
+            mode="wez_bridge_sentinel",
+            activity_type="sentinel_auto",
+        )
+
+        if not ok:
+            print(f"[{self._name}] Sentinel backend route failed for pane {pane_id}")
+            # Clear pending so we don't retry forever
+            session.pending_sentinel = None
+            self._sessions._save_session(session)
+            return
+
+        # Backend responded — resolve sentinel into permanent messages
+        self._resolve_sentinel(session, pane_id, snippet)
+
+    def _resolve_sentinel(self, session: Session, pane_id: str, snippet: str):
+        """Convert pending sentinel into user+assistant messages.
+
+        Generates:
+          user: [HH:MM:SS] 哨兵报告：Pane {id} — {last error line}
+          assistant: backend reply (if any)
+
+        Then clears pending_sentinel and applies compaction if the backend
+        signalled it.
+        """
+        from datetime import datetime
+
+        reply = session.metadata.get("last_reply", "")
+        now_str = datetime.now().strftime("%H:%M:%S")
+
+        # Build user-facing summary from the sentinel snippet
+        snippet_last_line = (
+            snippet.strip().split("\n")[-1][:100] if snippet else "pane output"
+        )
+        user_msg = f"[{now_str}] 哨兵报告：Pane {pane_id} — {snippet_last_line}"
+
+        # Append both messages to the session (each add_message saves)
+        self._sessions.add_message(
+            session.session_id,
+            Message(
+                role="user",
+                content=user_msg,
+                metadata={"source": "sentinel", "pane_id": pane_id},
+            ),
+        )
+        if reply:
+            self._sessions.add_message(
+                session.session_id,
+                Message(
+                    role="assistant",
+                    content=reply,
+                    metadata={"source": "sentinel_response"},
+                ),
+            )
+            # Clear last_reply so it isn't re-read by later rounds
+            session.metadata.pop("last_reply", None)
+
+        # Apply compaction if the backend signalled it
+        compacted_up_to = session.metadata.get("compacted_up_to")
+        if compacted_up_to is not None:
+            self._apply_compaction(session, compacted_up_to)
+
+        # Clear pending sentinel
+        session.pending_sentinel = None
+        session.last_active = time.time()
+        self._sessions._save_session(session)
+
+        print(f"[{self._name}] Sentinel resolved for pane {pane_id}: {user_msg[:100]}...")
+
+    def _apply_compaction(self, session: Session, compacted_up_to):
+        """Sync local session structure with backend compaction.
+
+        Backend sends ``compact_chunks`` (aligned with Proposal model):
+          [{summary, start_index, end_index}]
+        and ``compacted_up_to`` (cursor index).
+
+        Also handles ``cache_rebuilt`` if the backend rebuilt its cache.
+        """
+        # Store compact chunks if backend sent them
+        compact_chunks = session.metadata.pop("compact_chunks", None)
+        if compact_chunks:
+            session.compact_chunks = compact_chunks
+            print(f"[{self._name}] Compaction: {len(compact_chunks)} chunks, "
+                  f"compacted_up_to={compacted_up_to}")
+
+        # Track cache rebuild signal
+        cache_rebuilt = session.metadata.pop("cache_rebuilt", None)
+        if cache_rebuilt:
+            print(f"[{self._name}] Backend cache rebuilt — local state synced")
+
+        # Track sentinel rounds completed
+        rounds = session.metadata.pop("sentinel_rounds_completed", None)
+        if rounds is not None:
+            print(f"[{self._name}] Sentinel rounds completed: {rounds}")
+
+        session.metadata["compacted_up_to"] = compacted_up_to
 
     # ------------------------------------------------------------------
     # Tray menu

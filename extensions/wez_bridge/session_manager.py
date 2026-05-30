@@ -49,9 +49,15 @@ class Session:
     created_at: float = field(default_factory=time.time)
     last_active: float = field(default_factory=time.time)
     metadata: dict = field(default_factory=dict)
+    # Sentinel temp storage — NOT persisted as regular messages.
+    # Shape: {pane_id, snippet, cache_path, sent_at}
+    pending_sentinel: dict | None = None
+    # Backend compaction mirror — aligned with MemoryCompactor/Proposal.
+    # Shape: [{summary, start_index, end_index}]
+    compact_chunks: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
-        return {
+        d = {
             "session_id": self.session_id,
             "summary": self.summary,
             "messages": [m.to_dict() for m in self.messages],
@@ -59,6 +65,11 @@ class Session:
             "last_active": self.last_active,
             "metadata": self.metadata,
         }
+        if self.pending_sentinel is not None:
+            d["pending_sentinel"] = self.pending_sentinel
+        if self.compact_chunks:
+            d["compact_chunks"] = self.compact_chunks
+        return d
 
     @classmethod
     def from_dict(cls, d: dict) -> "Session":
@@ -70,6 +81,8 @@ class Session:
             created_at=d.get("created_at", time.time()),
             last_active=d.get("last_active", time.time()),
             metadata=d.get("metadata", {}),
+            pending_sentinel=d.get("pending_sentinel"),
+            compact_chunks=d.get("compact_chunks", []),
         )
 
 
