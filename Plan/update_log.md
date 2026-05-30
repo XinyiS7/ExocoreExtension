@@ -1,5 +1,44 @@
 # WezTerm Bridge (wez_bridge)
 
+## 哨兵复用 on_chat session + 后端契约对齐 + 压缩消息流重组
+
+**需求：** 哨兵告警不再每次创建新 session，改为复用交互式对话 session，以保证后端 per-preset Gemini context cache 命中。哨兵内容存入临时字段 `pending_sentinel`，不入 messages；后端返回 summary 后再生成两条永久消息。后端压缩/缓存重建时同步更新本地 session 结构（compact_chunks + raw messages）。
+
+**方案简述：**
+- `Session` dataclass 新增 `pending_sentinel: dict|None`（哨兵临时载荷）和 `compact_chunks: list[dict]`（后端压缩摘要镜像）
+- `_on_sentinel_alert` 调用 `_get_or_create_chat_session()` 复用 `_on_chat` 的 session，哨兵内容写入 `pending_sentinel` 而非 messages
+- 新增 `_process_sentinel`（daemon 线程发送→等待后端响应）、`_resolve_sentinel`（生成 `user: [HH:MM:SS] 哨兵报告` + `assistant: reply` 两条消息并清除 pending）、`_apply_compaction`（重组消息流：compact_chunks → 首条 `user: "这是之前的会话总结：..."`，保留 n+1 开始的原始消息，若首条保留消息为 user 则丢弃避免连续 user）
+- 后端契约：`external_session_id` 始终发 ext 自生成的 `session.session_id`（非条件判断）；新增 `cached_up_to_index` 字段收→存→回传；后端响应 `compact_chunks` 对齐 Proposal 模型 `[{summary, start_index, end_index}]`
+- 新增 `CLAUDE.md` 项目文档
+
+**涉及后端：**
+- cache key 是 per-preset `cli_conv.id`，不依赖 `external_session_id` —— ext 复用 session 不影响 cache
+- 后端新增响应字段：`compact_chunks`（Proposal 对齐）、`cache_rebuilt`（bool）、`sentinel_rounds_completed`（int）
+- `pending_sentinel` 字段后端无校验，直接忽略
+
+**改动文件：**
+| 文件 | 变更 |
+|------|------|
+| `extensions/wez_bridge/session_manager.py` | 修改 — Session +pending_sentinel +compact_chunks，to_dict/from_dict 序列化 |
+| `extensions/wez_bridge/context_builder.py` | 修改 — build_full_context/build_inject_payload 携带 pending_sentinel、compact_chunks、cached_up_to_index；external_session_id 始终发 session.session_id |
+| `extensions/wez_bridge/extension.py` | 修改 — _on_sentinel_alert 重写；+_get_or_create_chat_session +_process_sentinel +_resolve_sentinel +_apply_compaction；_on_chat 跟踪 _active_chat_session_id |
+| `extensions/wez_bridge/message_router.py` | 修改 — route_to_exocore 响应处理 +compact_chunks +cached_up_to_index +cache_rebuilt +sentinel_rounds_completed |
+| `tests/wez_bridge/test_context_builder.py` | 修改 — test_external_session_id_in_payload 适配新语义（ext 生成） |
+| `CLAUDE.md` | 新建 — 项目级 Claude Code 指南 |
+
+**新增或主要更变的函数：**
+- `_get_or_create_chat_session()` — 取活跃 chat session，无则创建回退 session（哨兵复用入口）
+- `_process_sentinel()` — daemon 线程：发 sentinel→等后端响应→调用 _resolve_sentinel
+- `_resolve_sentinel()` — 后端响应后生成 user 哨兵报告 + assistant reply 两条消息，清除 pending_sentinel，触发 compaction
+- `_apply_compaction()` — 后端压缩同步：compact_chunks→首条 user 摘要消息，保留 n+1 起原始消息，去连续 user 重复
+- `Session.to_dict/from_dict` — 序列化 pending_sentinel（None 时跳过）和 compact_chunks
+
+**是否成功验收：** 是（107/107 tests passed，pytest tests/wez_bridge/ -v）
+
+**署名+日期：** CC / 骆白萧 — 2026-05-30
+
+---
+
 ## 哨兵手动开关 + 后台活动标记 + 去熵值误报
 
 **需求：** 哨兵不应自启动，需用户手动 `/sentinel on` 开启（离开屏幕前）。哨兵告警与用户聊天需在 payload 中区分，后端据此处理为后台活动。熵值翻转检测误报率太高（正常终端输出全触发），砍掉只保留错误关键词匹配。
