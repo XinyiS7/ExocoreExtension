@@ -588,21 +588,65 @@ class WezBridgeExtension(BaseExtension):
 
         print(f"[{self._name}] Sentinel resolved for pane {pane_id}: {user_msg[:100]}...")
 
-    def _apply_compaction(self, session: Session, compacted_up_to):
-        """Sync local session structure with backend compaction.
+    def _apply_compaction(self, session: Session, compacted_up_to: int):
+        """Restructure session messages after backend compaction.
 
         Backend sends ``compact_chunks`` (aligned with Proposal model):
           [{summary, start_index, end_index}]
-        and ``compacted_up_to`` (cursor index).
+        and ``compacted_up_to`` (the last compacted index, n).
 
-        Also handles ``cache_rebuilt`` if the backend rebuilt its cache.
+        Restructuring rules:
+        - Build a single user message: "这是之前的会话总结：{summaries}"
+        - Keep raw messages from n+1 onward
+        - If the first kept message (was n+1) is ``user`` → discard
+          (avoids two consecutive user messages)
+        - Replace session.messages with the restructured list
         """
-        # Store compact chunks if backend sent them
         compact_chunks = session.metadata.pop("compact_chunks", None)
+
         if compact_chunks:
+            # Assemble compact summary as first user message
+            summaries = " ".join(
+                c.get("summary", "") for c in compact_chunks
+            )
+            compact_msg = f"这是之前的会话总结：{summaries}"
+
+            # Raw messages start from compacted_up_to + 1
+            raw_start = compacted_up_to + 1
+            raw = session.messages[raw_start:] if raw_start < len(session.messages) else []
+
+            # Discard first kept message if it's also user (no consecutive users)
+            if raw and raw[0].role == "user":
+                discarded = raw.pop(0)
+                print(f"[{self._name}] Compaction: discarding consecutive user msg "
+                      f"at index {raw_start}: {discarded.content[:60]}...")
+
+            # Rebuild message list
+            new_messages = [
+                Message(
+                    role="user",
+                    content=compact_msg,
+                    metadata={
+                        "source": "compaction",
+                        "compacted_up_to": compacted_up_to,
+                        "chunk_count": len(compact_chunks),
+                    },
+                ),
+            ]
+            new_messages.extend(raw)
+
+            old_count = len(session.messages)
+            session.messages = new_messages
             session.compact_chunks = compact_chunks
-            print(f"[{self._name}] Compaction: {len(compact_chunks)} chunks, "
-                  f"compacted_up_to={compacted_up_to}")
+
+            print(f"[{self._name}] Compaction applied: {old_count} msgs → "
+                  f"{len(new_messages)} msgs ({len(compact_chunks)} chunks, "
+                  f"compacted_up_to={compacted_up_to})")
+
+            # compacted_up_to is no longer meaningful after restructuring —
+            # the old indices are gone. Clear it so the backend doesn't
+            # receive a stale cursor.
+            session.metadata.pop("compacted_up_to", None)
 
         # Track cache rebuild signal
         cache_rebuilt = session.metadata.pop("cache_rebuilt", None)
@@ -613,8 +657,6 @@ class WezBridgeExtension(BaseExtension):
         rounds = session.metadata.pop("sentinel_rounds_completed", None)
         if rounds is not None:
             print(f"[{self._name}] Sentinel rounds completed: {rounds}")
-
-        session.metadata["compacted_up_to"] = compacted_up_to
 
     # ------------------------------------------------------------------
     # Tray menu

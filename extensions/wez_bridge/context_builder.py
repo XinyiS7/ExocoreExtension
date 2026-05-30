@@ -117,10 +117,14 @@ class ContextBuilder:
         }
         if custom_title:
             payload["custom_title"] = custom_title
-        # Carry external_session_id from previous responses for session correlation
-        ext_sid = context.get("metadata", {}).get("external_session_id")
-        if ext_sid:
-            payload["external_session_id"] = ext_sid
+        # external_session_id is ext-generated (session.session_id);
+        # backend echoes it back unchanged. Always send it.
+        payload["external_session_id"] = context.get("session_id", "")
+        # Carry cached_up_to_index from previous response so backend can
+        # decide whether the Gemini context cache still matches.
+        cached_up_to = context.get("metadata", {}).get("cached_up_to_index")
+        if cached_up_to is not None:
+            payload["cached_up_to_index"] = cached_up_to
         # Pass pending sentinel as dedicated field (backend ignores unknown fields)
         pending = context.get("pending_sentinel")
         if pending:

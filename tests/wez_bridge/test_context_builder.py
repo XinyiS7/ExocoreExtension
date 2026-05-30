@@ -117,6 +117,7 @@ class TestContextBuilder:
         assert truncated.endswith("...")
 
     def test_external_session_id_in_payload(self):
+        """external_session_id is always the ext-generated session.session_id."""
         session = self.sm.create_session("test", {"external_session_id": "ext_abc123"})
         context = self.cb.build_full_context(session, host_pane_id="1")
         payload = self.cb.build_inject_payload(
@@ -125,4 +126,5 @@ class TestContextBuilder:
             capture_method="terminal",
             target_storage="external_session",
         )
-        assert payload["external_session_id"] == "ext_abc123"
+        # Always uses ext-generated session_id, not metadata value
+        assert payload["external_session_id"] == session.session_id

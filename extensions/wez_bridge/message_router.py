@@ -131,6 +131,9 @@ class MessageRouter:
             # Compaction sync — backend may return compact_chunks aligned with Proposal model
             if response.get("compact_chunks"):
                 session.metadata["compact_chunks"] = response["compact_chunks"]
+            # Cache cursor: backend tells us how many messages are cached in Gemini context cache
+            if response.get("cached_up_to_index") is not None:
+                session.metadata["cached_up_to_index"] = response["cached_up_to_index"]
             if response.get("cache_rebuilt"):
                 session.metadata["cache_rebuilt"] = response["cache_rebuilt"]
             if response.get("sentinel_rounds_completed") is not None:
