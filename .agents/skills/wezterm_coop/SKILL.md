@@ -22,6 +22,7 @@ Mandatory Audit: Every file modification or database schema change performed by 
 WezTerm cross-pane protocol (read → send → verify → submit):
 **Primary**: Git Bash (Priority):
 ```bash
+echo $WEZTERM_PANE                                               # 0. Know where you are
 wezterm cli list                                                 # 1. discover pane IDs
 wezterm cli get-text --pane-id <id> | tail -n 20                 # 2. READ before acting
 echo -e "[from: <agent>]\n<message>" | wezterm cli send-text --pane-id <id> --no-paste 

@@ -42,7 +42,7 @@ SENTINEL_ERROR_KEYWORDS = [
 # ---------------------------------------------------------------------------
 # Cache directory (pane crash dumps)
 # ---------------------------------------------------------------------------
-EXOCORE_DATA_ROOT = r"D:\Alicia\ExoCoreData"
+EXOCORE_DATA_ROOT = r"D:\Alicia\ExoCore_Project\ExoCoreData\ExtensionData"
 CACHE_DIR = os.path.join(EXOCORE_DATA_ROOT, "cache")
 
 # ---------------------------------------------------------------------------

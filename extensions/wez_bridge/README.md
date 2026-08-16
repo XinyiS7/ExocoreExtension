@@ -83,7 +83,7 @@ python sandro_tui.py
 | `SENTINEL_TRUNCATE_OUTPUT_CHARS` | `2000` | 告警时保留的尾部字符数 |
 | `SENTINEL_ENTROPY_THRESHOLD` | `10` | 低于此值视为低熵（静默提示符） |
 | `LOCAL_SERVER_PORT` | `8777` | 本地 HTTP 服务端口 |
-| `CACHE_DIR` | `D:\Alicia\ExoCoreData\cache` | Pane 转储缓存目录 |
+| `CACHE_DIR` | `D:\Alicia\ExoCore_Project\ExocoreData\ExtensionData\cache` | Pane 转储缓存目录 |
 
 ### 更改哨兵使用的 Agent
 
@@ -106,7 +106,7 @@ python sandro_tui.py
 
 1. 你在 Pane 2 跑 `npm install`，报了一堆 `ERESOLVE` 错误
 2. 哨兵检测到关键词 `Error` + 内容突变 → 触发告警
-3. Pane 2 内容被截取存入 `D:\Alicia\ExoCoreData\cache\pane_2_20260526_143021.log`
+3. Pane 2 内容被截取存入 `D:\Alicia\ExoCore_Project\ExocoreData\ExtensionData\cache\pane_2_20260526_143021.log`
 4. 上下文上报 ExoCore（`special_extend` 模式）
 5. ExoCore Superior 链路分析错误，生成修复命令：
    ```

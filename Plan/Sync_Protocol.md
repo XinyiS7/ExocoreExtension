@@ -8,7 +8,7 @@
 ## Environment
 
 - **Primary shell**: WSL/Ubuntu (Bash)
-- **Python interpreter**: `/e/Conda/envs/exocore_project/python.exe` (full path required in Git Bash; in WSL use the conda env activated in shell)
+- **Python interpreter**: `/e/Miniconda3/envs/exocore_project/python.exe` (full path required in Git Bash; in WSL use the conda env activated in shell)
 - **Command chaining**: `&&` (Linux syntax — never use `;` for sequential-dependent commands)
 - **Working directory**: `/mnt/d/Alicia/ExoCore`
 

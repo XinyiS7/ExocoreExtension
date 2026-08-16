@@ -4,13 +4,7 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="我日终于架上了！">
-      <change beforePath="$PROJECT_DIR$/.claude/settings.local.json" beforeDir="false" afterPath="$PROJECT_DIR$/.claude/settings.local.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/agent_registry.json" beforeDir="false" afterPath="$PROJECT_DIR$/agent_registry.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/clipboard_capture/config.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/clipboard_capture/config.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/extensions/wez_bridge/wezterm_cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/extensions/wez_bridge/wezterm_cli.py" afterDir="false" />
-    </list>
+    <list default="true" id="e4bd2136-ecf3-4749-8c6f-abacd644e716" name="Changes" comment="我日终于架上了！" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />

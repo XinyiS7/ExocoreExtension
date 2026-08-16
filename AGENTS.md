@@ -1,5 +1,10 @@
 # ExoCoreExtension — Agent Instructions
 
+**Before working:** read `../.agent/project.md` and `../AGENT.md` for cross-module context.
+**API dependency check:** when changing any backend-facing code, verify against
+`../ExoCore/.agent/insight/backend.yaml` (the authoritative endpoint catalog).
+Extension-to-backend couplings are documented in (when available) `.agent/insight/api_deps.yaml`.
+
 ## Environment
 
 - **Platform**: Windows only (depends on `uiautomation`, `pywin32`, `keyboard`).
