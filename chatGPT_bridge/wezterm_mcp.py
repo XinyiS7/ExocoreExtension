@@ -15,6 +15,7 @@ wezterm_mcp.py — 极薄 MCP server：把 wezterm cli 包装成 4 个 MCP 工�
 
 运行：python.exe wezterm_mcp.py   （默认 stdio transport）
 """
+import ctypes
 import json
 import os
 import shutil
@@ -28,10 +29,16 @@ from pathlib import Path
 # 里运行：profile 的 mcp-command 指向该 venv 的 python。
 from mcp.server import MCPServer
 
-mcp = MCPServer(name="wezterm-pane", version="1.0.1")
+mcp = MCPServer(name="wezterm-pane", version="1.0.2")
 
 WEZTERM_CLI = shutil.which("wezterm") or shutil.which("wezterm.exe") or "wezterm"
-TIMEOUT = 10.0
+TIMEOUT = 5.0
+
+
+# 探活句柄权限：PROCESS_QUERY_LIMITED_INFORMATION 足以查存活
+_OPEN_PROCESS = ctypes.windll.kernel32.OpenProcess
+_CLOSE_HANDLE = ctypes.windll.kernel32.CloseHandle
+_PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
 
 
 def _sock_dir() -> Path:
@@ -39,17 +46,40 @@ def _sock_dir() -> Path:
     return Path(home) / ".local" / "share" / "wezterm"
 
 
-def _ensure_wezterm_socket() -> None:
-    """确保 WEZTERM_UNIX_SOCKET 已设置。
+def _pid_alive(pid: int) -> bool:
+    """Windows 进程存活检查：OpenProcess 成功即存活（零 spawn）。"""
+    handle = _OPEN_PROCESS(_PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+    if not handle:
+        return False
+    _CLOSE_HANDLE(handle)
+    return True
+
+
+def _socket_pid(sock: Path) -> "int | None":
+    """从 gui-sock-<pid> 文件名提取 PID；格式不符返回 None。"""
+    name = sock.name
+    if not name.startswith("gui-sock-"):
+        return None
+    suffix = name[len("gui-sock-"):]
+    return int(suffix) if suffix.isdigit() else None
+
+
+def _resolve_wezterm_socket() -> "Path | None":
+    """发现当前可用的 WezTerm GUI socket（每次调用现算，不缓存）。
 
     WezTerm GUI 会把 WEZTERM_UNIX_SOCKET 注入每个 pane 的 shell 环境，
     但从 pane 内被某些 spawner（anyio stdio_client、tunnel-client）拉起的
     进程会被过滤掉该变量；没有它时 wezterm cli 在 Windows 上靠扫描
-    gui-sock-* 文件自行发现 socket，多 GUI 场景下可能连错/连不上。
-    这里自己发现：按 mtime 从新到旧逐个试，取第一个能列出窗格的 socket。
+    gui-sock-* 文件自行发现 socket，多 GUI / 死实例残留场景下会连错。
+
+    本实现（对齐 ExoCore 本体 2026-07-31 修复模式）：
+    - 候选 = gui-sock-* 按 mtime 从新到旧（新窗口优先）；
+    - 探活 = 文件名内嵌 PID 的进程存活检查（OpenProcess，微秒级、
+      不 spawn 任何进程——wezterm cli 连死 socket 时反而会尝试拉起
+      新 mux-server 并挂起，绝不能拿它当探活手段）；
+    - env 里的 WEZTERM_UNIX_SOCKET 仅作为额外候选（MCP 常驻进程
+      的 env 是旧的，重开窗口后不可直接信任）。
     """
-    if os.environ.get("WEZTERM_UNIX_SOCKET"):
-        return
     try:
         socks = sorted(
             _sock_dir().glob("gui-sock-*"),
@@ -57,31 +87,35 @@ def _ensure_wezterm_socket() -> None:
             reverse=True,
         )
     except OSError:
-        return
+        socks = []
+
+    # env 候选补全为完整路径（cli 只认完整路径，裸文件名会挂起）
+    env_val = os.environ.get("WEZTERM_UNIX_SOCKET")
+    if env_val:
+        env_path = Path(env_val)
+        if not env_path.is_absolute():
+            env_path = _sock_dir() / env_path
+        if env_path not in socks and env_path.name.startswith("gui-sock-"):
+            socks.append(env_path)
+
     for sock in socks:
-        os.environ["WEZTERM_UNIX_SOCKET"] = str(sock)
-        try:
-            proc = subprocess.run(
-                [WEZTERM_CLI, "cli", "list", "--format", "json"],
-                capture_output=True, text=True, timeout=3,
-            )
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            continue
-        if proc.returncode == 0 and proc.stdout.strip():
-            return  # 这个 socket 活着且能列出窗格
-    os.environ.pop("WEZTERM_UNIX_SOCKET", None)
-
-
-_ensure_wezterm_socket()
+        pid = _socket_pid(sock)
+        if pid is not None and _pid_alive(pid):
+            return sock
+    return None
 
 
 def _run_cli(*args: str) -> tuple[int, str, str]:
     """Run `wezterm cli <args>`, return (returncode, stdout, stderr)."""
-    _ensure_wezterm_socket()
+    sock = _resolve_wezterm_socket()
+    proc_env = dict(os.environ)
+    if sock:
+        proc_env["WEZTERM_UNIX_SOCKET"] = str(sock)
     try:
         proc = subprocess.run(
             [WEZTERM_CLI, "cli", *args],
             capture_output=True, text=True, timeout=TIMEOUT,
+            env=proc_env,
         )
         return proc.returncode, proc.stdout, proc.stderr
     except subprocess.TimeoutExpired:

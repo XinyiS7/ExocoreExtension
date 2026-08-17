@@ -36,8 +36,11 @@ bash 只读契约；engram 只碰记忆。每个 server 的安全声明都保持
 - **无 shell 能力**：不存在任意命令执行面，最坏情况是往窗格里打字
 - **WEZTERM_UNIX_SOCKET 自修复**：GUI 会把该变量注入 pane shell，但 stdio_client /
   tunnel-client 在 Windows 上会过滤环境变量把它丢掉，导致 cli 连不上 GUI socket
-  （多 GUI 时发现逻辑还会翻车）。server 启动时会自动扫描 `~/.local/share/wezterm/`
-  下的 `gui-sock-*`，挑一个能用的补回去。
+  （旧实现还有多 GUI / 死实例残留时 mtime 选错的问题，2026-08-17 修复）。
+  server 每次调用现算：扫描 `~/.local/share/wezterm/` 下的 `gui-sock-*`，
+  按 mtime 新到旧 + 文件名内嵌 PID 的进程存活探活（OpenProcess，零 spawn），
+  返回首个活实例；env 旧值仅作额外候选。socket 以**完整路径**注入本次
+  subprocess（wezterm cli 只认完整路径，裸文件名会挂起并 spawn mux-server）。
 
 ## 本地自测
 
@@ -138,6 +141,10 @@ agent profile 全量 18 个工具，这里只挑索哥高频 5 个，避免工�
 ## 后台化（不占 pane）
 
 三个 profile 中 wezterm-pane 延续手动 pane 方式（实现简洁且索哥在用）；
+⚠️ 2026-08-17 起：wezterm-pane 也建议统一由 start_tunnel_services.ps1 托管
+（避免错环境 / 孤儿进程残留）；若仍手动跑，务必用隔离 venv
+`C:/Users/Alicia/.venvs/wezterm-mcp-bridge` 的 python.exe 拉起，禁止用共享
+环境。
 engram + local-workspace 由脚本隐藏窗口后台管理：
 
 ```powershell
