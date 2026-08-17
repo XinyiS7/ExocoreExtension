@@ -140,11 +140,17 @@ agent profile 全量 18 个工具，这里只挑索哥高频 5 个，避免工�
 
 ## 后台化（不占 pane）
 
-三个 profile 中 wezterm-pane 延续手动 pane 方式（实现简洁且索哥在用）；
-⚠️ 2026-08-17 起：wezterm-pane 也建议统一由 start_tunnel_services.ps1 托管
-（避免错环境 / 孤儿进程残留）；若仍手动跑，务必用隔离 venv
-`C:/Users/Alicia/.venvs/wezterm-mcp-bridge` 的 python.exe 拉起，禁止用共享
-环境。
+三个 profile 全部由 start_tunnel_services.ps1 隐藏窗口后台管理（2026-08-17 起
+wezterm-pane 一并纳入）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File start_tunnel_services.ps1   # 启动三件套
+powershell -ExecutionPolicy Bypass -File stop_tunnel_services.ps1    # 停止（杀全部）
+```
+
+⚠️ 运行时进程链会呈现「venv python → 基础解释器 python」，这是 Windows venv
+的正常二段式（pyvenv.cfg 指向 `E:\Miniconda3\envs\exocore_project`），
+**不是双实例污染**，勿误杀 body 进程。
 engram + local-workspace 由脚本隐藏窗口后台管理：
 
 ```powershell
