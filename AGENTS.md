@@ -89,6 +89,9 @@ Auto-migrates v1 flat-list format. Tests that need isolation create fresh `Agent
 
 - `GEMINI.md` — project overview, DST data locations, known bugs/workarounds.
 - `BUGLOG.md` — resolved DST bridge bugs with root-cause analysis.
+- **`chatGPT_bridge/README.md` — ChatGPT↔WezTerm MCP 桥与三 tunnel 工具面全说明书**
+  （wezterm/local-workspace/engram 架构、init/后台脚本、已知坑：connector 单 tunnel
+  单 server 限制 / 8080 撞车 / Git Bash 逃逸残留；经验与坑都在它自己目录里）。
 - `.agents/skills/footgun/SKILL.md` — environment-specific mistakes catalog.
 - `.agents/skills/wezterm_coop/SKILL.md` — multi-agent WezTerm cooperation protocol.
 - `Plan/` — architecture blueprints and implementation plans.
