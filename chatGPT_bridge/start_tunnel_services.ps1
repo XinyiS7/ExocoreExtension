@@ -6,6 +6,11 @@
 #   - 健康: ~/.config/tunnel-client/health-<profile>.url
 $ErrorActionPreference = "Stop"
 
+# 显式指定 profile 目录：Windows 上 tunnel-client 默认去 %APPDATA%\tunnel-client 找，
+# 但三个 yaml 实际在 ~/.config/tunnel-client（init 时写入的位置）。
+# 不设置的话 run 秒挂：`read config file ...: The system cannot find the path specified`（2026-08-26 踩坑）。
+$env:TUNNEL_CLIENT_PROFILE_DIR = "C:/Users/Alicia/.config/tunnel-client"
+
 $profiles = @("engram", "local-workspace", "wezterm-pane")
 $tunnelBin = "$env:USERPROFILE\bin\tunnel-client.exe"
 $logDir = "$env:USERPROFILE\.config\tunnel-client\logs"
