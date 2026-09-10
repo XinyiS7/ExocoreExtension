@@ -1,68 +1,61 @@
-# Skill: WezTerm Multi-Agent Cooperation (wezterm_coop)
+---
+name: wezterm-pane-interaction
+description: Pure interaction and coordination protocols for WezTerm CLI agents across multiple panes.
+---
 
-## 1. Description
-Standards and operational procedures for high-fidelity multi-agent collaboration within the WezTerm environment. This skill ensures synchronization between the Primary Agent (Executor) and the Auditor Agent across panes.
+# WezTerm Pane 跨窗协作协议
 
-2. Environment Standards
-Primary Shell: WezTerm running git bash is the absolute priority. All agents must default to standard Bash syntax (e.g., echo, tail, forward slashes /) for system operations.
+跨窗通信必须精准、克制、静默。拒绝一切形式主义报备与繁冗客套。
 
-Fallback Shell: powershell-gramma is the fallback ONLY if Git Bash is strictly unavailable.
+---
 
-Python Environment: Conda environment exocore_project must be pre-activated.
+## 核心六项原则（铁律）
 
-Command Syntax: Use python directly for script execution. Do NOT use absolute interpreter paths unless troubleshooting environment desync.
+1. **回车键是 `\r`**：WezTerm TUI 交互式 Agent（pi / opencode / codex）中，提交执行必须发送 `\r`（Carriage Return）。普通换行 `\n` 只换行不提交。若要人工复核，仅发文本不发 `\r`。
+2. **标准通信节拍：`get` → `send` → `get` → `回车` → `get`**：
+   - **Step 1 (Check)**：`get-text` 检查目标当前状态（忙则等待，空闲才发；并留意底部上下文用量）；
+   - **Step 2 (Stage)**：`send-text` 发送消息文本（不带 `\r`）；
+   - **Step 3 (Verify)**：`get-text` 确认文本已完整落入对方输入缓冲区；
+   - **Step 4 (Submit)**：`send-text` 发送 `\r` 提交执行；
+   - **Step 5 (Confirm)**：`get-text` 确认对方已接收并开始执行。
+3. **空闲高用量主动压缩（交接窗口期）**：
+   - Step 1 探测目标状态时，若对方空闲且上下文用量逼近阈值（如 1M 模型达到 ~250k–300k tokens），**在派发新任务前先为其发送压缩命令**（如 `/compact\r`）。
+   - 目标处于交接静止期是唯一的安全压缩时机。待其压缩完毕并恢复空闲后，再正式提交下一阶段任务，杜绝模型在长上下文下遗忘职责或产生“无跨窗能力”等幻觉。
+4. **禁止状态广播（非必要不通信）**：绝不发送无实质内容的废话报备（如「我开始了」「我结束了」「测试通过」）。仅在有明确交接物、独占资源协调、或对方正在等本 pane release 时才联系。
+5. **发完即等，禁止轮询**：确认对方开始工作后，立即停止调用工具转入静默等待。严禁持续 `get-text` 轮询监视对方。
+6. **收信即干，禁止复读**：收到对方消息或阶段结论后，**除非有实质异议需要讨论，否则直接开工**。严禁多回一句「收到」「好的，我继续」等无意义礼节，杜绝死循环往返。
 
-3. Collaboration Protocol
-Primary Agent (Executor): Responsible for research, strategy, and execution. Runs in the primary working pane.
+---
 
-Auditor Agent: Responsible for security audit, architectural review, and safety confirmation. Runs in the designated auditor pane (configured per session).
+## 标准命令行参考
 
-Mandatory Audit: Every file modification or database schema change performed by the Primary Agent MUST be reviewed and approved by the Auditor before finalization.
-
-WezTerm cross-pane protocol (read → send → verify → submit):
-**Primary**: Git Bash (Priority):
+### 1. 识别与探测
 ```bash
-echo $WEZTERM_PANE                                               # 0. Know where you are
-wezterm cli list                                                 # 1. discover pane IDs
-wezterm cli get-text --pane-id <id> | tail -n 20                 # 2. READ before acting
-echo -e "[from: <agent>]\n<message>" | wezterm cli send-text --pane-id <id> --no-paste 
-                                                                 # 3. SEND (no Enter yet)
-wezterm cli get-text --pane-id <id> | tail -n 10                 # 4. VERIFY text landed
-echo -ne "\n" | wezterm cli send-text --pane-id <id> --no-paste  # 5. SUBMIT (Enter)
-```
-Fallback: PowerShell (Only if Bash is unavailable):
-```powershell
-wezterm cli list                                                 # 1. discover pane IDs
-(wezterm cli get-text --pane-id <id>) -split "`n" | Select-Object -Last 20 
-                                                                 # 2. READ before acting
-Write-Output "[from: <agent>]`n<message>" | wezterm cli send-text --pane-id <id> --no-paste 
-                                                                 # 3. SEND (no Enter yet)
-(wezterm cli get-text --pane-id <id>) -split "`n" | Select-Object -Last 10 
-                                                                 # 4. VERIFY text landed
-wezterm cli send-text --pane-id <id> --no-paste "`r"             # 5. SUBMIT (Enter)
+# 确认自身 Pane ID
+echo $WEZTERM_PANE
+
+# 探测目标 Pane 列表与状态
+wezterm cli list
+wezterm cli get-text --pane-id <TARGET_PANE> | tail -n 15
 ```
 
-## 4. Operational Workflow
+### 2. 标准两步提交（推荐）
+```bash
+# 1. 发送消息文本（前缀注明发送者）
+wezterm cli send-text --pane-id <TARGET_PANE> --no-paste "[<Name> from pane $MY_PANE]: <Message>"
 
-### Phase 1: Context Synchronization
-- Before starting a new task, the Primary Agent must read the active `Plan/*.md` files and the agent's context file (`CLAUDE.md` / `GEMINI.md` as applicable) to align with the global state.
-- The Primary Agent must provide a concise "Work Plan" to the user and wait for acknowledgment.
+# 2. 检查落字后，提交回车（Windows/Git Bash 推荐 Python 防引号转义）
+python.exe -c "import subprocess; subprocess.run(['wezterm', 'cli', 'send-text', '--pane-id', '<TARGET_PANE>', '--no-paste', '\r'])"
+```
 
-### Phase 2: Audited Execution
-1. **Prepare**: The Primary Agent prepares the code change or SQL command.
-2. **Review**: The Primary Agent presents the proposed change to the user (who bridges it to the Auditor for review).
-3. **Act**: Only after receiving the "Audit Passed" signal, the Primary Agent applies the change.
-4. **Log**: Update `Plan/ExoCore_Worklog.md` immediately after successful execution.
+### 3. 高用量压缩触发（空闲交接前）
+```bash
+# 若目标已达 ~250k–300k tokens 且处于空闲等待状态，在派发新任务前执行：
+python.exe -c "import subprocess; subprocess.run(['wezterm', 'cli', 'send-text', '--pane-id', '<TARGET_PANE>', '--no-paste', '/compact\r'])"
+# 发送后 get-text 确认压缩完成，再发送新任务
+```
 
-### Phase 3: State Persistence
-- The Primary Agent must use `state_snapshot` in session summaries to preserve the `task_state`, `active_constraints`, and `artifact_trail` for the next session.
-
-## 5. Security & Safety
-- **Credential Protection**: Never print or commit `.env` content.
-- **Environment Isolation**: Always exclude `.venv`, `.git`, and `chroma_db` from recursive searches to prevent infinite loops or data leakage.
-- **Error Logging**: Any environment-specific failure (e.g., PowerShell syntax error) must be recorded in the "Agent Operational Memo & Error Log" section of the agent's operational context file.
-
-## 6. Success Metrics
-- Zero un-audited file modifications.
-- 100% synchronization between `Worklog` and actual repository state.
-- Successful execution of `python test_rag.py` after retrieval-related changes.
+### 4. 人工复核驻留（仅发送文本，不回车）
+```bash
+wezterm cli send-text --pane-id <TARGET_PANE> --no-paste "[<Name> from pane $MY_PANE]: <Message>"
+```
