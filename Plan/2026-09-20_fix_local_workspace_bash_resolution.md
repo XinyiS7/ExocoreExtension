@@ -95,7 +95,7 @@
 | 文件工具 / list_dir 行为 | — | 不变（回归通过） |
 
 环境侧不变（`which bash` 仍是 System32 WSL）——修的是 bridge 自己的解析，不动系统 PATH。
-Git Bash 环境与干净会话环境两轮均 45/45；E2E（第 3 项）待重启 profile 后由 ChatGPT 侧确认。
+Git Bash 环境与干净会话环境两轮均 45/45；E2E 已经 ChatGPT 侧（索哥）实测确认（2026-09-20）。
 
 ## 提交与文档
 - 提交：`ExoCore-Extension` 仓，仅本 memo + bridge 三文件（脚本/测试/README），不夹带他人在途改动；
