@@ -85,9 +85,13 @@ tunnel-client run --profile wezterm-pane
   `..` / 绝对路径逃逸直接拒绝。没有第二个写入口。
 - **bash 只读契约**：`cd ROOT && cmd` 显式锁 cwd（不依赖进程 cwd——tunnel-client
   拉起时 cwd 不可控），只允许查询类命令（rg / git status / diff / tail…）。
+shell **固定 Git Bash**（显式解析，拒绝 System32/WindowsApps 的 WSL 启动器）；
+交给 bash 的路径转成 MSYS 语法（`/d/...`）；路径入参 `/d/...` 与 `D:/...` 两种写法都收，
+**不支持 WSL 的 `/mnt/d/...`**。
 - **edit_file 全成或不动**：old_text 必须唯一命中，多块互不重叠，任一失败整个
   文件保持原样——大文件局部修改、git diff 干净。
-- ROOT 来自 `--root` argv（写死在 profile command），默认 `D:/Alicia/ExoCore_Project`。
+- ROOT 来自 `--root` argv（写死在 profile command；`D:/...` 或 `/d/...` 皆可），
+  默认 `D:/Alicia/ExoCore_Project`。
 
 ### 工具
 
@@ -115,7 +119,7 @@ tunnel-client doctor --profile local-workspace --explain  # 体检
 tunnel-client run --profile local-workspace               # 上岗（额外一个 pane）
 ```
 
-自测：`python.exe local_workspace/test_local_workspace.py`（28 例，monkeypatch 临时目录，不碰真实库）。
+自测：`python.exe local_workspace/test_local_workspace.py`（45 例，monkeypatch 临时目录，不碰真实库）。
 
 ## engram（记忆面）
 
@@ -187,6 +191,15 @@ tunnel-client run --profile wezterm-pane
 - 8080 被 Docker/nginx 占用 → yaml 已改用 `127.0.0.1:0` 随机端口（health.url 会记录实际端口）
 - Windows 上 stdio_client/tunnel-client 拉起子进程会过滤环境变量，
   wezterm_mcp.py 已内置 WEZTERM_UNIX_SOCKET 自修复，无需处理
+- **bash_readonly 的 WSL 劫持（血泪，2026-09-20）**：tunnel-client 由 PowerShell 拉起，
+  干净会话 PATH 第一位是 `C:\WINDOWS\system32`，那里躺着 WSL 的 `bash.exe`；而 Git 只把
+  `cmd\`（**里面没有 bash.exe**）放进 PATH，真正的 `bin\bash.exe` 不在 PATH 上 —— 于是
+  `shutil.which("bash")` 唯一能命中的就是 WSL 启动器，命令静默跑进 WSL Ubuntu
+  （`MSYSTEM` 为空、无 conda/wezterm、drvfs 语义）。现已显式解析 Git Bash 并拒绝
+  System32/WindowsApps（后者是 `wsl.exe` 软链），解析落空**直接报错**、绝不退回裸 `bash`。
+  同源教训见 `ExoCore/core/shell.py::_resolve_bash_exe`（后端 2026-08-16 踩过）。
+  注：Git Bash 自己兼容 `cd D:/...`，所以单看报错容易误判为「路径格式」问题；
+  `/bin/bash:` 前缀（Git Bash 会说 `/usr/bin/bash:`）才是 WSL 的口音。
 - **server/discover（重要）**：ChatGPT connector 会周期性重建/刷新 tool 注册，
   向 MCP server 发 `server/discover`。mcp SDK <2.0.0（FastMCP）不认识这个方法，
   会 pydantic 报错，connector 判定注册失效 → 会话中途所有工具变

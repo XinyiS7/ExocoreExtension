@@ -11,9 +11,12 @@ local_workspace_mcp.py — 文件面 MCP server：给 ChatGPT 端索哥的受控
 - 无任意命令变更能力：bash 只读契约，执行类命令一律走 wezterm pane
 - 路径沙箱：所有 path 参数 resolve 后必须落在 ROOT 内（.. / 绝对路径逃逸直接拒绝）
 - 写必须走工具（write_file / edit_file），不存在第二个写入口
+- shell 固定 Git Bash（显式解析，拒绝 System32/WindowsApps 的 WSL 启动器），
+  交给 bash 的路径转成 MSYS 语法（/d/...）；工具入参 /d/... 与 D:/... 两种写法都收
 - 与 wezterm_mcp.py 同款 mcp 2.0.0 MCPServer（原生兼容 OpenAI connector 的
   server/discover 动态注册，见 chatGPT_bridge/README.md「已知坑」）
-- ROOT 来自 --root argv，绝不依赖进程 cwd（tunnel-client 拉起时 cwd 不可控）
+- ROOT 来自 --root argv（Windows 或 /d/... 写法皆可），绝不依赖进程 cwd
+  （tunnel-client 拉起时 cwd 不可控）
 
 运行：<wezterm-mcp-bridge venv>/python.exe local_workspace_mcp.py
       --root D:/Alicia/ExoCore_Project
@@ -22,6 +25,7 @@ import argparse
 import fnmatch
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -31,11 +35,78 @@ from mcp.server import MCPServer
 mcp = MCPServer(name="local-workspace", version="1.0.0")
 
 DEFAULT_ROOT = "D:/Alicia/ExoCore_Project"
-GIT_BASH = r"C:/Program Files/Git/bin/bash.exe"
 OUTPUT_LINE_CAP = 2000
 OUTPUT_BYTE_CAP = 100_000
 
 ROOT = Path(DEFAULT_ROOT).resolve()
+
+
+# ---------------------------------------------------------------------------
+# 路径域：Windows（文件工具 API） ↔ MSYS（Git Bash / WezTerm pane）
+# ---------------------------------------------------------------------------
+# 三个域别混：
+#   read_file/write_file/...（本模块 API）  Windows：D:\Alicia\...
+#   Git Bash / pane 里看到的                MSYS：  /d/Alicia/...
+#   仓库相对（GitHub 面）                    repo：  ExoCore/core/models.py
+# 对齐 ExoCore/core/shell.py：入参默认按 bash(MSYS) 语法理解，检测到 Windows 盘符
+# 则原样使用；交给 bash 的路径反向转成 /d/...。WSL 的 /mnt/d/... 不支持。
+_MSYS_DRIVE_RE = re.compile(r"^/([A-Za-z])/(.*)$")
+_WIN_DRIVE_RE = re.compile(r"^([A-Za-z]):[\\/](.*)$")
+
+
+def _to_windows(path: str) -> str:
+    """入参归一化：/d/Alicia/... → D:\\Alicia\\...；Windows 写法原样返回。"""
+    m = _MSYS_DRIVE_RE.match(path)
+    if not m:
+        return path
+    rest = m.group(2).replace("/", "\\")
+    return m.group(1).upper() + ":\\" + rest
+
+
+def _to_bash(p: Path) -> str:
+    """交给 bash 的路径：D:\\Alicia\\... → /d/Alicia/...（Git Bash 原生语法）。"""
+    s = str(p).replace("\\", "/")
+    m = _WIN_DRIVE_RE.match(s)
+    if m:
+        return f"/{m.group(1).lower()}/{m.group(2)}"
+    return s
+
+
+def _sh_quote(s: str) -> str:
+    """单引号包裹（内部单引号转义）—— 拼进 bash 脚本的路径必须过这里。"""
+    return "'" + s.replace("'", "'\\''") + "'"
+
+
+# ---------------------------------------------------------------------------
+# Git Bash 解析 —— 绝不落到 System32 / WindowsApps 的 WSL 启动器
+# ---------------------------------------------------------------------------
+# 血泪（与 ExoCore/core/shell.py::_resolve_bash_exe 同源，后端 2026-08-16 踩过）：
+# 干净会话 PATH 里 System32 排第一，而 Git 只把 cmd\（里面没有 bash.exe）放进
+# PATH，bin\bash.exe 不在 PATH 上 —— shutil.which("bash") 唯一能命中的就是 WSL
+# 启动器，命令会静默跑进 WSL Ubuntu（MSYSTEM 空、无 conda/wezterm、drvfs 语义）。
+_GIT_BASH_ENV_VARS = ("ProgramW6432", "ProgramFiles", "ProgramFiles(x86)")
+
+
+def _is_wsl_launcher(p: Path) -> bool:
+    """System32\\bash.exe（WSL 启动器）/ WindowsApps\\bash.exe（→ wsl.exe 软链）。"""
+    return bool({"system32", "windowsapps"} & {part.lower() for part in p.parts})
+
+
+def _resolve_bash_exe() -> "str | None":
+    """解析可信的 Git Bash；找不到返回 None（调用方明确报错，不退回裸 bash）。"""
+    found = shutil.which("bash.exe") or shutil.which("bash")
+    if found:
+        cand = Path(found)
+        if cand.exists() and not _is_wsl_launcher(cand):
+            return str(cand)
+    for env in _GIT_BASH_ENV_VARS:
+        base = os.environ.get(env)
+        if not base:
+            continue
+        cand = Path(base) / "Git" / "bin" / "bash.exe"
+        if cand.exists():
+            return str(cand)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -52,8 +123,12 @@ def _within(root: Path, p: Path) -> bool:
 
 
 def _resolve(path: str) -> Path:
-    """解析用户路径并强制约束在 ROOT 内；越界直接抛 ValueError。"""
-    p = Path(path)
+    """解析用户路径并强制约束在 ROOT 内；越界直接抛 ValueError。
+
+    入参三种写法：相对 ROOT（"ExoCore/core/models.py"）、Windows 绝对
+    （"D:/Alicia/..."）、Git Bash 语法绝对（"/d/Alicia/..."，pane 里看到的那种）。
+    """
+    p = Path(_to_windows(path))
     if not p.is_absolute():
         p = ROOT / p
     rp = p.resolve()
@@ -227,13 +302,22 @@ def bash_readonly(cmd: str, timeout: int = 30) -> str:
     仅用于查询：rg / grep / ls / cat / tail / git status / git diff / git log /
     find / pwd 等。禁止任何变更类命令（写入、删除、安装、构建、提交等）——
     执行类操作请通过 wezterm pane（send_to_pane）进行。
-    命令在 ROOT 下以 `cd ROOT && <cmd>` 方式运行（不依赖进程 cwd）。
+    命令在 ROOT 下以 `cd ROOT && <cmd>` 方式运行（不依赖进程 cwd）；shell 固定为
+    Git Bash，ROOT 以 MSYS 语法（/d/...）传入；命令里的绝对路径 /d/... 与 D:/... 均可。
     """
     if not 1 <= timeout <= 120:
         return "[bash_readonly] timeout must be 1..120"
-    bash = shutil.which("bash") or (GIT_BASH if os.path.exists(GIT_BASH) else "bash")
-    posix_root = str(ROOT).replace("\\", "/")
-    script = f"cd {posix_root} && {cmd}"
+    bash = _resolve_bash_exe()
+    if bash is None:
+        progs = os.environ.get("ProgramFiles") or r"C:\Program Files"
+        expected = Path(progs) / "Git" / "bin" / "bash.exe"
+        return (
+            "[bash_readonly] Git Bash not found — refusing to fall back to a bare 'bash' "
+            "(the only bash on PATH is the WSL launcher in C:\\Windows\\System32; "
+            f"commands would silently run inside WSL). Expected: {expected}"
+        )
+    bash_root = _to_bash(ROOT)
+    script = f"cd {_sh_quote(bash_root)} && {cmd}"
     try:
         proc = subprocess.run(
             [bash, "-lc", script],
@@ -246,7 +330,7 @@ def bash_readonly(cmd: str, timeout: int = 30) -> str:
     out = proc.stdout or ""
     if proc.stderr:
         out += "\n[stderr]\n" + proc.stderr
-    hint = f"[bash_readonly] rc={proc.returncode} | cwd={posix_root}"
+    hint = f"[bash_readonly] rc={proc.returncode} | bash={bash} | cwd={bash_root}"
     return _clip(out, hint)
 
 
@@ -301,7 +385,7 @@ def main() -> None:
     parser.add_argument("--root", default=DEFAULT_ROOT, help="workspace root (default: %(default)s)")
     args = parser.parse_args()
     global ROOT
-    ROOT = Path(args.root).resolve()
+    ROOT = Path(_to_windows(args.root)).resolve()
     if not ROOT.is_dir():
         raise SystemExit(f"--root is not a directory: {ROOT}")
     mcp.run()

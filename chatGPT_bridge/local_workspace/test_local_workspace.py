@@ -88,17 +88,54 @@ check("edit overlap rejected", "overlap" in r, r)
 r = lw.edit_file("../escape.py", json.dumps([{"old_text": "a", "new_text": "b"}]))
 check("edit escape rejected", "escapes" in r, r)
 
+# --- 路径域转换（Windows ↔ MSYS）---
+print("== path domains ==")
+check("to_windows msys drive", lw._to_windows("/d/Alicia/x") == "D:\\Alicia\\x")
+check("to_windows windows passthrough", lw._to_windows("D:/Alicia/x") == "D:/Alicia/x")
+check("to_windows leaves /mnt (no WSL)", lw._to_windows("/mnt/d/Alicia/x") == "/mnt/d/Alicia/x")
+check("to_bash windows drive", lw._to_bash(Path("D:/Alicia/x")) == "/d/Alicia/x")
+check("to_bash leaves relative", lw._to_bash(Path("a/b.txt")) == "a/b.txt")
+check("sh_quote wraps", lw._sh_quote("/d/a b") == "'/d/a b'")
+check("sh_quote escapes quote", lw._sh_quote("it's") == "'it'\\''s'")
+check("resolve bash-style abs inside", lw._resolve(lw._to_bash(tmp / "alpha.txt")) == (tmp / "alpha.txt"))
+try:
+    lw._resolve("/d/definitely_outside_root")
+    check("resolve bash-style escape rejected", False)
+except ValueError:
+    check("resolve bash-style escape rejected", True)
+
+# --- bash 解析：绝不落到 WSL 启动器（2026-09-20 根因锁）---
+print("== bash resolution (no WSL) ==")
+check("wsl launcher detected (System32)", lw._is_wsl_launcher(Path(r"C:\Windows\System32\bash.exe")))
+check("wsl launcher detected (WindowsApps)", lw._is_wsl_launcher(Path(r"C:\Users\x\AppData\Local\Microsoft\WindowsApps\bash.exe")))
+check("git bash is not flagged", not lw._is_wsl_launcher(Path(r"C:\Program Files\Git\bin\bash.exe")))
+bash_exe = lw._resolve_bash_exe()
+check("resolved bash exists + not WSL", bash_exe is not None and Path(bash_exe).exists() and not lw._is_wsl_launcher(Path(bash_exe)), str(bash_exe))
+check("resolved bash is a Git install", bash_exe is not None and "git" in bash_exe.lower(), str(bash_exe))
+
 # --- bash_readonly ---
 print("== bash_readonly ==")
 (tmp / "probe.txt").write_text("hello", encoding="utf-8")
 r = lw.bash_readonly("pwd")
-check("bash cwd locked", str(lw.ROOT).replace("\\\\", "/").replace("\\", "/").lower() in r.lower(), r[:120])
+check("bash cwd locked (bash domain)", lw._to_bash(lw.ROOT).lower() in r.lower(), r[:160])
+check("bash cwd not windows form", str(lw.ROOT).replace("\\", "/").lower() not in r.lower(), r[:160])
 r = lw.bash_readonly("cat probe.txt")
 check("bash read works", "hello" in r, r)
 r = lw.bash_readonly("rg -n 'row100' big.txt")
 check("bash rg works", "row100" in r, r)
 r = lw.bash_readonly("sleep 5", timeout=1)
 check("bash timeout", "timed out" in r, r)
+
+# --- ROOT 含空格：cd 引号加固（不靠「路径恰好没空格」侥幸）---
+print("== bash_readonly (ROOT with spaces) ==")
+tmp_sp = Path(tempfile.mkdtemp(prefix="lw test sp_"))
+lw.ROOT = tmp_sp
+(tmp_sp / "sp probe.txt").write_text("space-ok", encoding="utf-8")
+r = lw.bash_readonly("cat 'sp probe.txt'")
+check("bash ROOT with spaces", "space-ok" in r, r[:200])
+check("bash spaces no cd error", "No such file or directory" not in r, r[:200])
+lw.ROOT = tmp
+shutil.rmtree(tmp_sp, ignore_errors=True)
 
 # --- list_dir ---
 print("== list_dir ==")
