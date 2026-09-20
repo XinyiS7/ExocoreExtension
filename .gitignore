@@ -25,4 +25,7 @@ D:\Alicia\ExoCore_Project\ExoCoreData\ExtensionData\
 # pkg
 ./chatGPT_bridge/tunnel-client-v0.0.11-windows-amd64
 # secrets
+.env
+*.env
+.env.*
 chatGPT_bridge/.local_chat_brigde.env.txt
