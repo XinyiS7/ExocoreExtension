@@ -145,24 +145,16 @@ agent profile 全量 18 个工具，这里只挑索哥高频 5 个，避免工�
 ## 后台化（不占 pane）
 
 三个 profile 全部由 start_tunnel_services.ps1 隐藏窗口后台管理（2026-08-17 起
-wezterm-pane 一并纳入）：
+wezterm-pane 一并纳入；2026-09-20 起 **start 幂等** = 先 stop 再起，stop 三 profile 全停）：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File start_tunnel_services.ps1   # 启动三件套
-powershell -ExecutionPolicy Bypass -File stop_tunnel_services.ps1    # 停止（杀全部）
+powershell -ExecutionPolicy Bypass -File start_tunnel_services.ps1   # 启动三件套（先自动 stop，幂等）
+powershell -ExecutionPolicy Bypass -File stop_tunnel_services.ps1    # 停止（三个 profile 全停）
 ```
 
 ⚠️ 运行时进程链会呈现「venv python → 基础解释器 python」，这是 Windows venv
 的正常二段式（pyvenv.cfg 指向 `E:\Miniconda3\envs\exocore_project`），
 **不是双实例污染**，勿误杀 body 进程。
-engram + local-workspace 由脚本隐藏窗口后台管理：
-
-```powershell
-# 启动
-powershell -ExecutionPolicy Bypass -File start_tunnel_services.ps1
-# 停止（只杀 engram / local-workspace，不碰 wezterm-pane）
-powershell -ExecutionPolicy Bypass -File stop_tunnel_services.ps1
-```
 
 - 日志：`~/.config/tunnel-client/logs/<profile>.log`（stdout）/ `.err`（stderr）
 - 健康：`~/.config/tunnel-client/health-<profile>.url`
@@ -189,6 +181,11 @@ tunnel-client run --profile wezterm-pane
   所有 profile 必须用 `--health-listen-addr "127.0.0.1:0"` 随机端口（README 各 init 命令已带）；
   还可以配 url_file 记录实际端口。已踩坑记录见 ExoCore_update_log（wezterm-pane 首次）。
 - 8080 被 Docker/nginx 占用 → yaml 已改用 `127.0.0.1:0` 随机端口（health.url 会记录实际端口）
+- **tunnel-client 残留累积（2026-09-20）**：start 管 3 个 profile 而 stop 只杀 2 个
+  （漏 wezterm-pane）→ 每轮 start 净增 1 个**活**残留 dispatcher（同一 tunnel 上多实例，
+  connector 可能派给跑旧代码的实例）。已对称化 + start 幂等。排查提示：
+  `Start-Process -RedirectStandardOutput` 每次启动**截断**日志，残留不会留在日志里，
+  只看进程表：`Get-CimInstance Win32_Process -Filter "Name='tunnel-client.exe'"`。
 - Windows 上 stdio_client/tunnel-client 拉起子进程会过滤环境变量，
   wezterm_mcp.py 已内置 WEZTERM_UNIX_SOCKET 自修复，无需处理
 - **bash_readonly 的 WSL 劫持（血泪，2026-09-20）**：tunnel-client 由 PowerShell 拉起，
