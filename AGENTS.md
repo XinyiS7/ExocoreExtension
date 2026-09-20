@@ -92,6 +92,9 @@ Auto-migrates v1 flat-list format. Tests that need isolation create fresh `Agent
 - **PowerShell `&&`** → `ParserError`. Use `;` instead. Bash (WSL) `&&` is fine.
 - **Smart quotes**: Editing Python containing Chinese text may silently inject `\u201C`/`\u201D` → `SyntaxError`.
 - **WSL Bash ≠ Git Bash**: The bash tool runs WSL; Django commands and Windows paths need PowerShell.
+  - Harness-dependent: pi/WezTerm's bash tool is **MSYS Git Bash** (`uname -a` → `MINGW64_NT…`; `/d/...` paths, `pwd -W` works, `D:/...` also fine). Self-check the shell with `uname -a` before assuming a path style.
+- **PowerShell + daemon output capture**: a script that spawns a detached process (`Start-Process -WindowStyle Hidden`) keeps the pipe open → `| tr` / `| grep` capture looks hung even though the script already finished. Redirect to a file and `cat` it.
+- **Line-end / file-state judging**: `grep -c $'\r'` in MSYS bash is unreliable, and `git status` can show a stale ` M` (with an empty `git diff`) after an external rewrite — use byte counts, `git ls-files --eol`, or `git hash-object` instead. Details in `.agents/skills/footgun/SKILL.md`.
 
 ## Existing instruction files
 

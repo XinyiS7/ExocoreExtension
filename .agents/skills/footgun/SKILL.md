@@ -5,6 +5,20 @@ Quick-reference catalogue of environment-specific mistakes that waste time when 
 
 ## Shell Mistakes
 
+### [2026-09-20] Piping a PowerShell Script That Spawns a Daemon Looks Like a Hang
+- **Context**: Capturing `powershell -File x.ps1` output through a bash pipe (`| tr -d '\r'`, `| grep`) while the script starts detached processes via `Start-Process -WindowStyle Hidden` (e.g. `start_tunnel_services.ps1` → tunnel-client). Hit twice on 2026-09-20 — two "timeouts" that were not real hangs at all.
+- **Precaution**: The daemon inherits the parent's stdout/stderr handles → the pipe's write end never closes → the downstream filter waits for EOF forever → bash looks hung **while the script already finished**. On a timeout, do not re-run first: check the process table / logs to see what actually happened.
+- **Quick Fix**: Redirect to a file and read it: `powershell -File x.ps1 > D:/tmp/out.txt 2>&1` then `cat D:/tmp/out.txt`; avoid `| tr` / `| grep` capture for scripts that spawn daemons.
+
+### [2026-09-20] Judging Line Endings in MSYS Bash: grep Lies, git status Lies Twice
+- **Context**: Git Bash (MSYS — the pi/WezTerm bash tool; `uname -a` answers `MINGW64_NT…`) while auditing CRLF/LF state.
+- **Precaution**:
+    - `grep -c $'\r'` is **not trustworthy** inside nested `$( … )` / quoting — the escape gets lost and the count is wrong (2026-09-20: reported pure-LF files as CRLF; nearly derailed a repo-wide baseline commit).
+    - After an external tool rewrites a file, the index's **stat cache** (size especially) goes stale → `git status` shows ` M` while `git diff` is **empty** (content identical); even `git update-index --refresh` may still answer "needs update".
+- **Quick Fix**:
+    - Count bytes via Python: `d=open(f,'rb').read(); print(d.count(b'\r\n'), d.count(b'\n')-d.count(b'\r\n'))`, or use `git ls-files --eol` (index / worktree / attr triple).
+    - To prove a `git status` M is fake: `git hash-object --path=<f> <f>` must equal the blob in `git ls-files -s -- <f>`; then `git add <f>` (zero staging) refreshes the cache.
+
 ### [2026-05-12] Assuming Common Python Packages are Installed
 - **Context**: Python scripts or Django codebase tools (e.g., `agents/tools.py`).
 - **Precaution**: Do not assume common packages like `psutil` or `requests` are present in the virtual environment. Always check `requirements.txt` before importing them dynamically, or you might cause silent `ModuleNotFoundError`s.
@@ -14,6 +28,7 @@ Quick-reference catalogue of environment-specific mistakes that waste time when 
 - **Context**: Bash tool runs WSL bash, not Git Bash. Django management commands + file paths.
 - **Precaution**: Django commands and Windows path operations MUST use **PowerShell**, not Bash. Git commands can use both, but prefer PS for consistency.
 - **Quick Fix**: Use `PowerShell` tool: `cd D:\Alicia\ExoCore_Project\ExoCore; python.exe manage.py <cmd>`
+- **Update 2026-09-20 — harness-dependent**: not every harness's bash tool is WSL. pi/WezTerm's is **MSYS Git Bash** (drive paths are `/d/...`; `D:/...` also works; `pwd -W` exists). Self-check with `uname -a` (`MINGW64_NT…` = MSYS, `Linux…` = WSL) before choosing a path style, and never let a script guess the shell — pin `C:\Program Files\Git\bin\bash.exe` explicitly.
 
 ### [2026-04-29] Smart Quotes in Python Source
 - **Context**: Editing Python files with Chinese docstrings via Edit tool.
