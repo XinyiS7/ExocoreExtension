@@ -12,6 +12,14 @@ Extension-to-backend couplings are documented in (when available) `.agent/insigh
 - **No lint/formatter/typecheck/CI config** — no `pyproject.toml`, `pre-commit`, or GitHub Actions.
 - **No build step** — pure Python, no codegen.
 
+## Text baseline
+
+`.gitattributes` + `.editorconfig` mirror the umbrella / ExoCore / ExoCore-Desktop baselines:
+text files are LF and `*.ps1` is CRLF **in the repo** (no reliance on a machine's `core.autocrlf`),
+images/archives are binary, and editors write UTF-8 with a final newline (Markdown keeps trailing
+spaces — they are legal hard breaks). Configuration only: no detector script or hooks, same call
+as the umbrella repo.
+
 ## Run
 
 ```bash
