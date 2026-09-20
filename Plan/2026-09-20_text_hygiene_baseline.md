@@ -52,6 +52,18 @@
 - 不动 `Plan/2026-09-07_*.md`、`extensions/uhh_mail/`（均非本次改动）；
 - 不改任何代码 / 测试。
 
+## 后续（同日授权，已落地）
+
+初稿的两条「不做」在执行中被 Alicia 后续授权推翻，记录在此以免误导：
+
+| 追加事项 | 提交 | 说明 |
+|---|---|---|
+| 提交 `extensions/uhh_mail/`（WIP 扩展） | `5fc193a` | 只提交 5 个源文件；`.env`（凭据）与 `__pycache__/**` 经 `check-ignore` + dry-run 证实排除；明文密钥扫描无命中 |
+| 收编 `.gitignore` 的 `.env` / `*.env` / `.env.*` 规则 | `43a63d0` | 该规则是 `uhh_mail/.env` 的实际防护；此前只存在于工作区，随 reset/checkout 即失效 |
+| 清除其余 tracked `.idea/` 文件 | `9b76d9e`、`8253ecb` | 含 `Project_Default.xml`（唯一含自定义设置者：PyPep8Naming 的 N806 豁免，Alicia 确认可删）与 `.gitignore` / `.iml` / `modules.xml` / `vcs.xml` / `profiles_settings.xml`；`git ls-files .idea/` 现为空 |
+
+结果：卫生瑕疵 `37 → 25`（CRLF / mixed / UTF-16 全清零；余下 13 处尾随空格 + 12 处缺末尾换行按计划留给 `.editorconfig` 生效后的编辑器保存）；`pytest tests/` 125 passed。
+
 ## 验证
 
 1. `git status` 仅显示预期改动（无 renormalize 噪音 —— 已用 `-c core.attributesFile` 试挂预演过）；
