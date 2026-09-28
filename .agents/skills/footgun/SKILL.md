@@ -1,115 +1,115 @@
-# Skill: Footgun
-
-Quick-reference catalogue of environment-specific mistakes that waste time when repeated.
-**Check this before running shell commands or editing Python files.**
-
-## Shell Mistakes
-
-### [2026-09-20] Piping a PowerShell Script That Spawns a Daemon Looks Like a Hang
-- **Context**: Capturing `powershell -File x.ps1` output through a bash pipe (`| tr -d '\r'`, `| grep`) while the script starts detached processes via `Start-Process -WindowStyle Hidden` (e.g. `start_tunnel_services.ps1` → tunnel-client). Hit twice on 2026-09-20 — two "timeouts" that were not real hangs at all.
-- **Precaution**: The daemon inherits the parent's stdout/stderr handles → the pipe's write end never closes → the downstream filter waits for EOF forever → bash looks hung **while the script already finished**. On a timeout, do not re-run first: check the process table / logs to see what actually happened.
-- **Quick Fix**: Redirect to a file and read it: `powershell -File x.ps1 > D:/tmp/out.txt 2>&1` then `cat D:/tmp/out.txt`; avoid `| tr` / `| grep` capture for scripts that spawn daemons.
-
-### [2026-09-20] Judging Line Endings in MSYS Bash: grep Lies, git status Lies Twice
-- **Context**: Git Bash (MSYS — the pi/WezTerm bash tool; `uname -a` answers `MINGW64_NT…`) while auditing CRLF/LF state.
-- **Precaution**:
-    - `grep -c $'\r'` is **not trustworthy** inside nested `$( … )` / quoting — the escape gets lost and the count is wrong (2026-09-20: reported pure-LF files as CRLF; nearly derailed a repo-wide baseline commit).
-    - After an external tool rewrites a file, the index's **stat cache** (size especially) goes stale → `git status` shows ` M` while `git diff` is **empty** (content identical); even `git update-index --refresh` may still answer "needs update".
-- **Quick Fix**:
-    - Count bytes via Python: `d=open(f,'rb').read(); print(d.count(b'\r\n'), d.count(b'\n')-d.count(b'\r\n'))`, or use `git ls-files --eol` (index / worktree / attr triple).
-    - To prove a `git status` M is fake: `git hash-object --path=<f> <f>` must equal the blob in `git ls-files -s -- <f>`; then `git add <f>` (zero staging) refreshes the cache.
-
-### [2026-05-12] Assuming Common Python Packages are Installed
-- **Context**: Python scripts or Django codebase tools (e.g., `agents/tools.py`).
-- **Precaution**: Do not assume common packages like `psutil` or `requests` are present in the virtual environment. Always check `requirements.txt` before importing them dynamically, or you might cause silent `ModuleNotFoundError`s.
-- **Quick Fix**: Prefer Python standard library fallbacks (e.g., `subprocess.run(["tasklist", ...])` instead of `psutil` on Windows) if the dependency isn't explicitly required.
-
-### [2026-04-29] WSL Path in Bash Tool
-- **Context**: Bash tool runs WSL bash, not Git Bash. Django management commands + file paths.
-- **Precaution**: Django commands and Windows path operations MUST use **PowerShell**, not Bash. Git commands can use both, but prefer PS for consistency.
-- **Quick Fix**: Use `PowerShell` tool: `cd D:\Alicia\ExoCore_Project\ExoCore; python.exe manage.py <cmd>`
-- **Update 2026-09-20 — harness-dependent**: not every harness's bash tool is WSL. pi/WezTerm's is **MSYS Git Bash** (drive paths are `/d/...`; `D:/...` also works; `pwd -W` exists). Self-check with `uname -a` (`MINGW64_NT…` = MSYS, `Linux…` = WSL) before choosing a path style, and never let a script guess the shell — pin `C:\Program Files\Git\bin\bash.exe` explicitly.
-
-### [2026-04-29] Smart Quotes in Python Source
-- **Context**: Editing Python files with Chinese docstrings via Edit tool.
-- **Precaution**: `"` `"` (U+201C/U+201D) and `'` `'` (U+2018/U+2019) cause `SyntaxError` in Python. The Edit tool may auto-convert typed ASCII quotes when mixed with Chinese text.
-- **Quick Fix**: `$content -replace [char]0x201C, '"' -replace [char]0x201D, '"' -replace [char]0x2018, "'" -replace [char]0x2019, "'"`
-
-### PowerShell Command Chaining
-- **Precaution**: Do NOT use `&&` to chain commands (causes `ParserError`). Use `;` instead.
-- **Quick Fix**: `git add . ; git commit -m "..."`
-
-### Unix vs Windows Tools
-- **Precaution**: DO NOT use `find .` for file searching; it invokes the Windows string search utility. Use `Get-ChildItem` or Claude Code's `Glob`/`Grep` tools.
-
-### Virtual Environment Hazards
-- **Precaution**: Recursive file operations often fail on `.venv/lib64` due to symlink loops. Always exclude `.venv` or target specific app directories.
-
-### Conda Interpreter
-- **Precaution**: Conda env `exocore_project` is pre-activated in WezTerm. Use `python.exe` directly.
-
+---
+name: footgun
+description: Route recurring precautions to DevelopLog/warnings.md and diagnosed incidents to DevelopLog/DebugLog.md; use when an error appears or knowledge must be recorded
+compatibility: pi
+metadata:
+  scope: exocore
 ---
 
-## Tool Loop Mistakes
+# Skill: Fault Routing Protocol
 
-### [2026-05-18] Gemini/OpenAI Tool Loop Conflation
-- **Context**: `agents/services.py` — Superior tool loop (`_run_tool_loop`) and simple tool loop (`_stream_with_tools`).
-- **Precaution**: Gemini and OpenAI have FUNDAMENTALLY different tool passback mechanisms:
-  - **Gemini**: thinking goes in user-FR `[prior_reasoning]` text parts; response content goes in model turn as regular content. NEVER put thinking on the model turn.
-  - **OpenAI/DeepSeek**: thinking MUST be `reasoning_content` on the assistant message. Content goes as `content` on the assistant message. Omitting `reasoning_content` causes 400 errors from DeepSeek.
-- **Quick Fix**: Use `LLMGateway.build_gemini_tool_round()` / `build_openai_tool_round()` instead of calling `make_fc_assistant_turn` + `make_tool_result_turns` directly. The builders encapsulate all platform-specific parameter routing.
-- **Design Principle**: Think of the model's flow as `.think → .say → tool → .think → .say → final`. Thinking is CoT (not output, user can't see). Response content IS output (user sees it, DB records it). The model must see its own intermediate content as proper output to continue coherently.
+`footgun` is a routing protocol, not a catalogue of mistakes.
 
----
+- `[Alicia / approved]` Stable precautions belong in `DevelopLog/warnings.md`.
+- `[Alicia / approved]` Diagnosed incidents, evidence chains, and architectural failures belong in `DevelopLog/DebugLog.md`.
+- Historical cases must not be appended to this skill.
 
-## The Three-Tier Error Protocol
+## 1. Before Work
 
-### Tier 1: Known Pattern
-- **Condition**: The error or a close variant already exists in this file or `./DevelopLog/DebugLog.md`.
-- **Action**: Apply the documented fix directly. Do not re-investigate from scratch.
-- **Logging**: If the fix required adaptation, append a brief update note.
+Do not read this file as a substitute for project history. For M/H construction work, search both logs using the affected module, framework, symbol, and failure terms:
 
-### Tier 2: New Error - Cause is Clear
-- **Condition**: The error is new but root cause is immediately apparent within 1-2 attempts.
-- **Action**: Resolve, then log.
-- **Logging**: Append to the top of the relevant section above. Focus on "What to avoid" and "The quick fix."
-
-### Tier 3: Unclear Cause or Architectural Impact
-- **Condition**: Root cause not apparent after 2 attempts, OR implicates system architecture, data integrity, or multiple components.
-- **Action**: **STOP immediately.** Do not keep guessing.
-- **Review sequence**:
-  1. Check this file for related patterns.
-  2. Check `./DevelopLog/DebugLog.md` for prior deep-dives.
-  3. If still unresolved, consult the user.
-- **Logging**: After resolution, create or update `./DevelopLog/DebugLog.md` using the template below.
-
----
-
-## Standardized Documentation Formats
-
-### [Template] Shell Mistakes Entry
-*Append to the TOP of the Shell Mistakes section.*
-
-```markdown
-### [YYYY-MM-DD] {Short Error Name}
-- **Context**: {File/Component}
-- **Precaution**: {Why it happened, what to check}
-- **Quick Fix**: `Code or command snippet`
+```bash
+rg -n "<module|framework|error|invariant>" DevelopLog/warnings.md DevelopLog/DebugLog.md
 ```
 
-### [Template] ./DevelopLog/DebugLog.md
-*Append new entries to the TOP.*
+Use the results differently:
+
+- `warnings.md`: apply the relevant preflight check or precaution before editing/running.
+- `DebugLog.md`: understand the prior evidence and root invariant; verify that the current failure is materially the same before reusing the old correction.
+
+For L-risk documentation/skill/config work, a targeted warning search is sufficient unless an error appears.
+
+## 2. Route a New Observation
+
+### Route A — `DevelopLog/warnings.md`
+
+Use a warning when all are true:
+
+- the knowledge is a stable, recurring precaution;
+- it can prevent failure before or during work;
+- the corrective check is short and actionable;
+- a full evidence narrative is unnecessary.
+
+Typical subjects: shell/runtime differences, encoding, framework test semantics, known dependency behavior, provider wire-contract restrictions, or configuration switches that alter tests.
+
+A warning entry contains only:
 
 ```markdown
-# DEBUG: {Issue Title} ({Status})
-- **Date**: YYYY-MM-DD
-- **Phenomenon**: {Error messages, behavior, logs}
-- **Inference & Evidence**:
-    1. {Inference}: {Why I think this? Evidence}
-- **Correction Plan**:
-    - [Plan A]: {Details}
-- **Correction Result**: {What worked? Verification step}
+### [YYYY-MM-DD] WARNING: <short name>
+- **Context**: <modules/frameworks>
+- **Precaution**: <what must be checked or avoided>
+- **Quick Check**: <short command or observable condition>
+- **Attribution**: [model / name]
 ```
 
-## Operational Mandate
-Prioritize **Persistence of Knowledge** over **Speed of Execution**. A bug solved but not recorded is technical debt.
+### Route B — `DevelopLog/DebugLog.md`
+
+Use DebugLog when any is true:
+
+- root cause was unclear or required multiple diagnostic attempts;
+- behavior crosses modules, transactions, persistence, concurrency, scheduler, provider, or process boundaries;
+- the obvious/local correction failed or created sibling regressions;
+- evidence is needed to distinguish the actual cause from plausible alternatives;
+- the finding changes an architectural invariant or future debugging strategy.
+
+A DebugLog entry records phenomenon, inference and evidence, confirmed root cause, correction, verification, affected versions/paths, and the reusable lesson. Preserve multi-author attribution for discovery, diagnosis, implementation, and approval.
+
+### Route C — Do Not Persist
+
+Do not create either entry for:
+
+- spelling or formatting mistakes;
+- one-off command typos with no reusable environment lesson;
+- an already documented case with no new constraint;
+- speculative causes that were not confirmed;
+- session narration, emotional commentary, or generic advice.
+
+If an existing entry needs one new constraint, update that entry rather than adding a near-duplicate.
+
+## 3. Failure Escalation
+
+1. **Known warning match**: apply the preflight/correction and verify the observable condition.
+2. **Known DebugLog match**: compare versions, entry path, state, timing, and side effects before reusing the correction.
+3. **New clear failure**: fix minimally, verify, then decide whether it has reusable warning value.
+4. **Unclear, repeated, or architectural failure**: stop local patching and load the `debug`/diagnosis workflow. Record in DebugLog after the root cause is confirmed.
+5. **Acceptance FAIL**: follow `builder-workflow` repair mode. The second failure of the same invariant requires a state/path/timing matrix; the third consecutive checkpoint FAIL enters Acceptance Adviser escalation.
+
+Never use an empty catch, silent fallback, or a passing command as evidence that an exception path succeeded.
+
+## 4. Knowledge Quality Gate
+
+Before saving an entry, verify:
+
+- the referenced class, field, method, setting, and command exist in current source;
+- the entry says which versions/state conditions matter;
+- the precaution does not contradict current project instructions or a newer DebugLog entry;
+- no credentials, private session text, proprietary data, or unsanitized external query are included;
+- attribution distinguishes contributor roles where more than one person/model participated.
+
+After recording:
+
+- run a targeted `rg` to ensure the entry is discoverable by likely module/error terms;
+- avoid copying the same incident into this skill, both logs, and a Plan;
+- use a Plan/acceptance report for task-specific chronology; use Engram only for durable cross-session decisions/root causes.
+
+## 5. Ownership Summary
+
+| Artifact | Owns | Does not own |
+|---|---|---|
+| `footgun` skill | classification and escalation rules | incident history |
+| `DevelopLog/warnings.md` | concise recurring precautions | long diagnosis narratives |
+| `DevelopLog/DebugLog.md` | confirmed root-cause/evidence records | preflight checklist catalogue |
+| `Plan/` | task scope, sequence, acceptance evidence, chronology | global error taxonomy |
+| Engram | durable cross-session decisions and root causes | session流水账 |
+
+[gpt-5.6-sol / Solaire — 2026-08-10; routing boundary approved by Alicia]

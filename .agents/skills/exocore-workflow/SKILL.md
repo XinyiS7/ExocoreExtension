@@ -30,17 +30,12 @@ python.exe .agent/insight/query_insight.py --file <path>
 核验链条：**Model 变更 → Serializer 映射 → View/Endpoint → 前端 SPAs (Desktop) / Windows Extension 消费点**。
 
 ### 2. 真实数据库基线检查（Real DB Discipline）
-- **基线恒为 8 条**：真实库 `AgentPreset` 严禁新增、删除或篡改主键（底层已由 PostgreSQL trigger 物理防护）。
-- **开工与收工强制核验**：在 `ExoCore/` 根目录下执行：
+- **操作手册**：`ExoCore/AGENTS.md` →「Real Database Discipline」（8 条基线、归档预设 id=3/4 复用、ORM 回写、禁裸 SQL）。
+- **本 skill 的强制点**：DB-sensitive 改动必须在**开工与收工各核验一次**：
   ```bash
   bash .agent/check_real_db_baseline.sh
   ```
-  必须确认终端输出 `OK: AgentPreset baseline 8 rows`。
-- **探测与测试规则**：
-  - 如需真实库实例做只读或字段级测试，**仅允许复用归档预设**（id=3 `Archived Chat` 或 id=4 `Archived G045 Chat`）；
-  - 测试完毕必须还原配置并将 `is_visible` 设为 false；
-  - 真实库数据写入与清理一律走 Django ORM，严禁裸 SQL DDL/INSERT。
-
+  终端必须输出 `OK: AgentPreset baseline 8 rows`。
 ---
 
 ## 二、 核心架构约束：G045 权限本位

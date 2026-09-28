@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Plan first, work later.
 
-**Before working:** read `../AGENT.md` and `AGENTS.md` for cross-module context and module-specific conventions.
+**Before working:** read this repo's `AGENTS.md` and the root `../AGENTS.md` for cross-module context and module-specific conventions.
 For API dependency checks, consult `../ExoCore/.agent/insight/backend.yaml` (the authoritative endpoint catalog).
 Extension-to-backend couplings are documented in `.agent/insight/api_deps.yaml` (when available).
 

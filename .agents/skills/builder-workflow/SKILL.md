@@ -86,3 +86,25 @@ Builder 的天职是**面向真实业务需求构建高质量、可维护的系�
 
 已停止施工，请求独立验收。
 ```
+
+---
+
+## 四、 施工经验沉淀（追加区）
+
+> 每轮施工后把「只有踩过才知道」的教训追加在这里：一条案例 + 一条可执行规则，不求长篇。后续 builder 继续往下追加。
+
+### 1. 搬移/替换既有调用块：先核对该块内的共享局部变量
+
+- **案例（2026-09-17，Checkpoint B）**：替换 `process_chat` 里的 `preflight_runtime_identity` 调用时，连带删掉了紧邻的 `system_prompt = ctx.system_prompt`，当时误判它“仅服务于 preflight”。实际它服务函数全身（Phase C LLM 执行、debug payload、input 统计共 4+ 处），dev server 热重载后**所有聊天路径 `NameError`**，真实会话现场报错。
+- **规则**：删除/替换任何一段代码前，对区间内出现的每一个**赋值**（局部变量、缓存、副作用）做一次全函数引用扫描（`grep -n "<name>" <file>` 或编辑器引用面板）。只要函数别处（任何分支/后续阶段）还会读它，就必须保留原位——“这个变量只为这段代码服务”是可证伪的假设，先证明再删。
+
+### 2. 改了宿主函数，验证集必须含它的真实驱动测试
+
+- **案例（同上）**：B 焦点回归组 8 个模块 131 条全绿，却漏掉 `process_chat` 的 `NameError`——因为组里没有一条真正驱动 `process_chat` 的测试（runtime 路径在 Phase C 之前就分流进 `_process_runtime_happy_path`，连 route 集成测试也追不到）。既有驱动测试 `agents.tests.test_assistant_trace::AssistantTracePersistenceTests::test_process_chat_persists_trace_projection_in_phase_d` 一跑即现。
+- **规则**：改动 `process_chat`（或任何入口级函数）后，验证集必须包含“从该入口真实走到改动行”的场景测试；被抽出的新函数单测**不算**集成证据。本项目 `process_chat` 驱动模块清单：`test_assistant_trace` / `test_services` / `test_assistant_arrival` / `test_audio_attachments` / `test_chat_artifacts_persistence` / `test_conversation_delete`（均在 `agents.tests` 下）。“绿了”只证明跑过的东西没问题，不证明没跑的东西没问题。
+
+### 3. 验收工装与冻结证据：Builder 只能跑，不能改（哪怕只是“加强”）
+
+- **案例（2026-09-25，R-C1 R3 / R-F01）**：我为 R-C1 的门禁探针 `Plan/Acceptance_Probes/agy_mcp_entry_schema_probe.py` 加了一个**相加性**用例（只新增，不动任何既有断言与用例），理由是它没覆盖我们实际落盘配置的组合形状。该探针确实是我写的、Plan 也把它列为 R-C1 门禁，于是我当成自己的资产顺手加强了。验收判定：**FAIL on artifact integrity**——该探针与 report 已被验收方冻结并引用为证据，写权限随之归验收方；要求精确 `git revert` 回退，并由验收方自己重新落地。
+- **规则**：一旦某个测试/探针/报告被验收方冻结并作为证据引用，Builder 对它**只有执行权、没有写权限**——包括“只增用例”“只更新 report”“只改注释”。发现缺口时：在交付消息里报告缺口 + 给可复现的复现方式与建议，由验收方自己落地。同理，提交一律用 `git commit <pathspec>` 限定自己的文件，避免把共享 worktree 里他人**已暂存**的内容带进自己的提交（含 `git mv` 改名）。
+- **边界辨析**：这与“修复门”不冲突——修自己的施工代码是本职；修**别人的验收工装**不是。验收方修工装，Builder 修产品，两边都不能替对方出手。
