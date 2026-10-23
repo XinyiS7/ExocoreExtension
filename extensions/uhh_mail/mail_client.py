@@ -37,6 +37,26 @@ class ProcessedEmail:
     is_high_priority: bool = False
     matched_reasons: list[str] = field(default_factory=list)
     body_snippet: str = ""
+    links: list[str] = field(default_factory=list)
+
+
+_URL_RE = re.compile(r"https?://[^\s<>\"')\]]+")
+
+
+def extract_links(text: str, limit: int = 5) -> list[str]:
+    """Pull unique URLs out of a mail body, preserving order.
+
+    A bare link is easy to miss in a wall of text, so links are surfaced
+    separately in the brief and in the CLI.
+    """
+    found: list[str] = []
+    for raw in _URL_RE.findall(text or ""):
+        link = raw.rstrip(".,;:!?'\"")
+        if link and link not in found:
+            found.append(link)
+            if len(found) >= limit:
+                break
+    return found
 
 
 def load_filter_rules(rules_path: Path) -> FilterRules:
@@ -231,6 +251,7 @@ def fetch_and_generate_brief() -> Path:
                 if res == "OK" and full_data:
                     full_msg = email.message_from_bytes(full_data[0][1])
                     body_text = extract_plain_text(full_msg)
+                    body_links = extract_links(body_text)
                     if len(body_text) > config.MAX_BODY_CHARS:
                         body_text = body_text[: config.MAX_BODY_CHARS] + "\n...(正文过长已截断)..."
 
@@ -243,6 +264,7 @@ def fetch_and_generate_brief() -> Path:
                         is_high_priority=True,
                         matched_reasons=reasons,
                         body_snippet=body_text,
+                        links=body_links,
                     )
                 )
             else:
@@ -286,6 +308,8 @@ def fetch_and_generate_brief() -> Path:
             lines.append(f"- **发件人**: {item.sender}")
             lines.append(f"- **时  间**: {item.date_str}")
             lines.append(f"- **命中规则**: {reasons_str}")
+            if item.links:
+                lines.append(f"- **链  接**: {' | '.join(item.links)}")
             lines.append("- **正文提要**:")
             lines.append("```text")
             lines.append(item.body_snippet if item.body_snippet else "(无正文内容)")

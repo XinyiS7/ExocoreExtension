@@ -106,6 +106,15 @@ def main():
         menu=pystray.Menu(*menu_items),
     )
 
+    # Optional hook: extensions that expose liveness status can take the icon.
+    for ext in extensions:
+        attach = getattr(ext, "attach_tray", None)
+        if callable(attach):
+            try:
+                attach(icon)
+            except Exception as e:
+                print(f"[ExoCore] {ext.name}: attach_tray failed: {e}")
+
     print(f"[ExoCore Extension Hub] Active. Primary Agent: {EXOCORE_AGENT_NAME}")
     icon.run()
 
